@@ -134,9 +134,9 @@ export const ImprovedMentorList: React.FC<ImprovedMentorListProps> = ({
                   className="p-4 hover:shadow-md transition-shadow cursor-pointer group"
                   role="button"
                   tabIndex={0}
-                  onClick={() => canManageTraits && onEditMentor(mentor)}
+                  onClick={() => onEditMentor(mentor)}
                   onKeyDown={(e) => {
-                    if ((e.key === 'Enter' || e.key === ' ') && canManageTraits) {
+                    if ((e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault();
                       onEditMentor(mentor);
                     }

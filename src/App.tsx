@@ -7,6 +7,7 @@ import { DataProvider } from "./contexts/DataContext";
 import { Toaster } from "./components/ui/sonner";
 import { LoadingState } from "./components/ui/LoadingState";
 
+
 // Import your pages
 import Login from "./pages/Login";
 import Events from "./pages/Events";
@@ -21,6 +22,7 @@ import Me from "./pages/Me";
 import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 import TestLoader from "./pages/TestLoader";
+import Info from "./pages/Info";
 
 // Import components
 import Layout from "./components/layout/Layout";
@@ -180,8 +182,18 @@ const AppContent = () => {
               <ProtectedRoute>
                 <Me />
               </ProtectedRoute>
-            } 
+            }
+             
           />
+          <Route
+            path="/Info"
+            element={
+              <ProtectedRoute>
+                <Info />
+              </ProtectedRoute>
+            }
+          />
+
           <Route 
             path="/verwaltung" 
             element={

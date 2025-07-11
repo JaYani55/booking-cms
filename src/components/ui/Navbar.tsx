@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../contexts/ThemeContext";
 import { usePermissions } from '@/hooks/usePermissions'; // Add this import
-import { Moon, Sun, Menu, Calendar, Users, User, List, X, Settings, LogOut } from "lucide-react";
+import { Moon, Sun, Menu, Calendar, Users, User, List, X, Settings, LogOut, HelpCircle } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import Logo from "../shared/Logo";
@@ -61,6 +61,15 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-2 md:gap-6">
+            {/* Info button to the left of language toggle */}
+            <Link
+              to="/Info"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-200 border transition-colors"
+              aria-label={language === "en" ? "Info" : "Info"}
+            >
+              <HelpCircle className="h-4 w-4" />
+              <span className="font-semibold">{language === "en" ? "Info" : "Info"}</span>
+            </Link>
             <button
               onClick={toggleLanguage}
               className="flex items-center gap-1.5 px-2 py-1 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-200 border transition-colors"

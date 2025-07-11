@@ -71,7 +71,31 @@ export const EventCard = ({
   const { requestToMentor, isRequestLoading } = useMentorRequests(event, user); 
   const { getUserProfile, events } = useData();
   const { canViewMentorProfiles, canViewStaffProfiles, canProcessMentorRequests, canRequestMentor } = usePermissions();
-  
+
+  // Loading state for product gradient
+  const [isProductLoading, setIsProductLoading] = useState(false);
+  const [productWithGradient, setProductWithGradient] = useState(event.ProductInfo);
+
+  useEffect(() => {
+    // If product gradient is missing, set loading and ensure it
+    if (!event.ProductInfo?.gradient) {
+      setIsProductLoading(true);
+      // Simulate async gradient ensuring (replace with actual fetch if needed)
+      setTimeout(() => {
+        if (event.ProductInfo) {
+          // Use ensureProductGradient from productService
+          // @ts-ignore
+          const { ensureProductGradient } = require("@/services/events/productService");
+          setProductWithGradient(ensureProductGradient(event.ProductInfo));
+        }
+        setIsProductLoading(false);
+      }, 100); // Simulate short delay
+    } else {
+      setProductWithGradient(event.ProductInfo);
+      setIsProductLoading(false);
+    }
+  }, [event.ProductInfo]);
+
   // DECLARE isPastEvent FIRST, before any other variables that might use it
   const isPastEvent = useMemo(() => isEventInPast(event), [event]);
   
@@ -170,7 +194,7 @@ export const EventCard = ({
   };
 
   // Get product info from event
-  const product = event.ProductInfo;
+  const product = productWithGradient;
   const productName = product?.name;
   const productIconName = product?.icon_name;
   const productGradient = product?.gradient;
@@ -180,6 +204,15 @@ export const EventCard = ({
   // Determine text color for product name
   const firstColor = extractFirstColor(productGradient) || "#3b82f6";
   const useWhiteText = isColorDark(firstColor);
+
+  // Show skeleton if product gradient is loading
+  if (isProductLoading) {
+    return (
+      <div className="w-full min-h-[420px] max-w-xl mx-auto rounded-3xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center">
+        <span className="text-lg text-muted-foreground">{language === "en" ? "Loading event…" : "Event wird geladen…"}</span>
+      </div>
+    );
+  }
 
   return (
     <Card

@@ -31,7 +31,7 @@ function isColorDark(hexColor: string): boolean {
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
   return brightness < 128;
 }
-
+ 
 // Helper to extract first color from a linear-gradient string, fallback to blue
 function extractFirstColor(gradient?: string): string {
   if (!gradient) return "#3b82f6";

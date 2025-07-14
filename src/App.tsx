@@ -265,7 +265,7 @@ const AppContent = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
       
-      <FloatingBugButton />
+      {/* <FloatingBugButton /> */}
       <FloatingFeedbackButton />
       <Toaster />
     </>

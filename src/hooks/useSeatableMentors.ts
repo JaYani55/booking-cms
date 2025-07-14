@@ -104,9 +104,9 @@ export function useSeatableMentors(options: UseSeatableMentorsOptions = {}) {
   // Try alternate tables if the mentor is not found
   const tryAlternateTables = useCallback(async (mentorId: string): Promise<SeaTableRow | null> => {
     try {
-      // Try the same table but without view filtering
-      const rows = await seatableClient.getFilteredRows(tableName, idField, mentorId);
-      return rows.length > 0 ? rows[0] : null;
+      // Always use extern view for fallback
+      const rows = await seatableClient.getTableRowsByView(tableName, 'extern', true);
+      return rows.find(m => m[idField] === mentorId) || null;
     } catch (err) {
       console.error(`[useSeatableMentors] Error trying alternate lookup for ${mentorId}:`, err);
       return null;
@@ -169,9 +169,9 @@ export function useSeatableMentors(options: UseSeatableMentorsOptions = {}) {
     if (mentors && mentors.length > 0) {
       return mentors;
     }
-    
     try {
-      const data = await seatableClient.getTableRows(tableName);
+      // Always use extern view for all mentor data
+      const data = await seatableClient.getTableRowsByView(tableName, 'extern', true);
       return data || [];
     } catch (error) {
       console.error('[useSeatableMentors] Error getting all mentors:', error);

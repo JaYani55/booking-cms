@@ -16,6 +16,44 @@ import { Label } from '@/components/ui/label';
 import { saveProductPage } from '@/services/productPageService';
 import { toast } from 'sonner';
 
+const ContentBlockSchema = z.union([
+  z.object({
+    id: z.string(),
+    type: z.literal('text'),
+    content: z.string(),
+    format: z.enum(['paragraph', 'heading1', 'heading2', 'heading3', 'bold', 'italic']).optional(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('image'),
+    src: z.string(),
+    alt: z.string(),
+    caption: z.string().optional(),
+    width: z.number().optional(),
+    height: z.number().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('quote'),
+    text: z.string(),
+    author: z.string().optional(),
+    source: z.string().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('list'),
+    style: z.enum(['ordered', 'unordered']),
+    items: z.array(z.string()),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('video'),
+    src: z.string(),
+    provider: z.enum(['youtube', 'vimeo', 'other']),
+    caption: z.string().optional(),
+  }),
+]);
+
 const PageBuilderSchema = z.object({
   cta: z.object({
     title: z.string(),
@@ -24,7 +62,7 @@ const PageBuilderSchema = z.object({
   }),
   faq: z.array(z.object({
     question: z.string(),
-    answer: z.string(),
+    answer: z.array(ContentBlockSchema),
   })),
   hero: z.object({
     image: z.string(),
@@ -33,7 +71,7 @@ const PageBuilderSchema = z.object({
       value: z.string(),
     })),
     title: z.string(),
-    description: z.string(),
+    description: z.array(ContentBlockSchema),
   }),
   cards: z.array(z.object({
     icon: z.string(),
@@ -44,7 +82,7 @@ const PageBuilderSchema = z.object({
   })),
   features: z.array(z.object({
     title: z.string(),
-    description: z.string(),
+    description: z.array(ContentBlockSchema),
     reverse: z.boolean().optional(),
   })),
   subtitle: z.string().optional(),
@@ -63,7 +101,7 @@ export const PageBuilderForm: React.FC<PageBuilderFormProps> = ({ initialData, p
     defaultValues: initialData || {
       cta: { title: '', description: '', primaryButton: '' },
       faq: [],
-      hero: { image: '', stats: [], title: '', description: '' },
+      hero: { image: '', stats: [], title: '', description: [] },
       cards: [],
       features: [],
       subtitle: '',

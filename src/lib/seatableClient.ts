@@ -4,7 +4,9 @@ import {
   SeaTableColumn, 
   SeaTableTableMetadata,
   SeaTableMetadata,
-  MentorMappingOptions
+  MentorMappingOptions,
+  SeaTableSelectOption,
+  SeaTableRowUpdate
 } from '@/types/seaTableTypes';
 
 export interface SeaTableBaseTokenResponse {
@@ -19,14 +21,35 @@ export interface SeaTableBaseTokenResponse {
 }
 
 // Add this helper function OUTSIDE the class, before the SimpleSeaTableClient class definition
-function mapOptionValues(value: any, column: SeaTableColumn): any {
-  if (!value || !column.data?.options) {
+const hasOwn = (object: unknown, property: string): boolean =>
+  typeof object === 'object' && object !== null && Object.prototype.hasOwnProperty.call(object, property);
+
+const logAxiosError = (context: string, err: unknown) => {
+  if (axios.isAxiosError(err)) {
+    console.error(context, {
+      status: err.response?.status,
+      statusText: err.response?.statusText,
+      data: err.response?.data,
+      url: err.config?.url,
+      message: err.message,
+    });
+  } else {
+    console.error(context, err);
+  }
+};
+
+function mapOptionValues(value: unknown, column: SeaTableColumn): unknown {
+  const options = Array.isArray(column.data?.options)
+    ? (column.data?.options as SeaTableSelectOption[])
+    : [];
+
+  if (!value || options.length === 0) {
     return value;
   }
 
   // Handle single select
   if (column.type === 'single-select' && typeof value === 'string') {
-    const option = column.data.options.find((opt: any) => opt.id === value);
+    const option = options.find(opt => opt.id === value);
     return option ? option.name : value;
   }
 
@@ -34,7 +57,10 @@ function mapOptionValues(value: any, column: SeaTableColumn): any {
   if (column.type === 'multiple-select') {
     if (Array.isArray(value)) {
       return value.map(id => {
-        const option = column.data.options.find((opt: any) => opt.id === id);
+        if (typeof id !== 'string') {
+          return id;
+        }
+        const option = options.find(opt => opt.id === id);
         return option ? option.name : id;
       });
     }
@@ -42,20 +68,36 @@ function mapOptionValues(value: any, column: SeaTableColumn): any {
     if (typeof value === 'string' && value.includes(',')) {
       const ids = value.split(',').map(id => id.trim());
       return ids.map(id => {
-        const option = column.data.options.find((opt: any) => opt.id === id);
+        const option = options.find(opt => opt.id === id);
         return option ? option.name : id;
       });
     }
     // Single ID as string
     if (typeof value === 'string') {
-      const option = column.data.options.find((opt: any) => opt.id === value);
+      const option = options.find(opt => opt.id === value);
       return option ? [option.name] : [value];
     }
   }
 
   // Handle collaborator fields
   if (column.type === 'collaborator' && Array.isArray(value)) {
-    return value.map(collab => collab.name || collab.email || collab);
+    return value.map(collab => {
+      if (typeof collab === 'string') {
+        return collab;
+      }
+
+      if (collab && typeof collab === 'object') {
+        if ('name' in collab && typeof collab.name === 'string') {
+          return collab.name;
+        }
+
+        if ('email' in collab && typeof collab.email === 'string') {
+          return collab.email;
+        }
+      }
+
+      return collab;
+    });
   }
 
   return value;
@@ -97,7 +139,7 @@ class SimpleSeaTableClient {
           this.clearCache();
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('[SeaTable] Error loading cached token:', err);
       this.clearCache();
     }
@@ -169,25 +211,41 @@ class SimpleSeaTableClient {
       console.log('- expires:', this.tokenExpiry.toLocaleString());
 
       return response.data;
-    } catch (err: any) {
-      console.error('[SeaTable] Error getting access token:', {
-        message: err.message,
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data
-      });
-      
-      this.clearCache();
-      
-      if (err.response?.status === 401) {
-        throw new Error('Invalid API token - please check your VITE_SEATABLE_API_KEY');
-      } else if (err.response?.status === 403) {
-        throw new Error('API token does not have permission to access this base');
-      } else if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-        throw new Error('Cannot connect to SeaTable servers - check your internet connection');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        console.error('[SeaTable] Error getting access token:', {
+          message: err.message,
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data
+        });
+      } else {
+        console.error('[SeaTable] Error getting access token:', err);
       }
-      
-      throw new Error(`Failed to get access token: ${err.response?.data?.detail || err.message}`);
+
+      this.clearCache();
+
+      if (axios.isAxiosError(err)) {
+        const status = err.response?.status;
+
+        if (status === 401) {
+          throw new Error('Invalid API token - please check your VITE_SEATABLE_API_KEY');
+        }
+
+        if (status === 403) {
+          throw new Error('API token does not have permission to access this base');
+        }
+
+        if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
+          throw new Error('Cannot connect to SeaTable servers - check your internet connection');
+        }
+
+        const detail = (err.response?.data as { detail?: string } | undefined)?.detail;
+        throw new Error(`Failed to get access token: ${detail || err.message}`);
+      }
+
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new Error(`Failed to get access token: ${message}`);
     }
   }
 
@@ -211,7 +269,7 @@ class SimpleSeaTableClient {
       // Use the NEW v2 API gateway rows endpoint
       const url = `https://cloud.seatable.io/api-gateway/api/v2/dtables/${this.dtableUuid}/rows/`;
       
-      const params: any = {
+      const params: Record<string, string> = {
         table_name: tableName
       };
       
@@ -222,7 +280,7 @@ class SimpleSeaTableClient {
       console.log('[SeaTable] Request URL:', url);
       console.log('[SeaTable] Request params:', params);
       
-      const response = await axios.get(url, {
+      const response = await axios.get<{ rows?: SeaTableRow[] } | SeaTableRow[]>(url, {
         params,
         headers: {
           'Authorization': `Bearer ${this.baseToken}`,
@@ -230,24 +288,25 @@ class SimpleSeaTableClient {
         }
       });
       
-      let rows = [];
-      if (response.data?.rows) {
-        rows = response.data.rows;
-      } else if (Array.isArray(response.data)) {
-        rows = response.data;
+      const payload = response.data;
+      let rows: SeaTableRow[] = [];
+
+      if (Array.isArray(payload)) {
+        rows = payload;
+      } else if (
+        payload &&
+        typeof payload === 'object' &&
+        Array.isArray((payload as { rows?: unknown }).rows)
+      ) {
+        rows = ((payload as { rows?: SeaTableRow[] }).rows) ?? [];
       }
-      
+
       console.log('[SeaTable] Successfully fetched rows:', rows.length);
       return rows;
       
-    } catch (err: any) {
-      console.error('[SeaTable] Error fetching table rows:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        url: err.config?.url
-      });
-      throw err;
+    } catch (err: unknown) {
+      logAxiosError('[SeaTable] Error fetching table rows:', err);
+      throw err instanceof Error ? err : new Error('Unknown error fetching table rows');
     }
   }
 
@@ -266,7 +325,7 @@ class SimpleSeaTableClient {
       console.log('[SeaTable] SQL Query:', requestData.sql);
       console.log('[SeaTable] Looking for:', { filterColumn, filterValue });
       
-      const response = await axios.post(url, requestData, {
+      const response = await axios.post<{ results?: SeaTableRow[] }>(url, requestData, {
         headers: {
           'Authorization': `Bearer ${this.baseToken}`,
           'Content-Type': 'application/json',
@@ -274,7 +333,7 @@ class SimpleSeaTableClient {
         }
       });
 
-      const results = response.data.results || [];
+      const results = response.data.results ?? [];
       console.log('[SeaTable] SQL Query successful, results:', results.length);
       
       // DEBUG: If no results, let's see what columns are available
@@ -286,7 +345,7 @@ class SimpleSeaTableClient {
         console.log('[SeaTable] Debug SQL:', debugSql);
         
         try {
-          const debugResponse = await axios.post(url, { sql: debugSql }, {
+          const debugResponse = await axios.post<{ results?: SeaTableRow[] }>(url, { sql: debugSql }, {
             headers: {
               'Authorization': `Bearer ${this.baseToken}`,
               'Content-Type': 'application/json',
@@ -294,7 +353,7 @@ class SimpleSeaTableClient {
             }
           });
           
-          const debugResults = debugResponse.data.results || [];
+          const debugResults = debugResponse.data.results ?? [];
           console.log('[SeaTable] Sample rows:', debugResults);
           
           if (debugResults.length > 0) {
@@ -308,13 +367,9 @@ class SimpleSeaTableClient {
       
       return results;
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.log('[SeaTable] SQL query failed, trying fallback...');
-      console.error('[SeaTable] SQL Error details:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
-      });
+      logAxiosError('[SeaTable] SQL Error details:', err);
       
       // Fallback: Get all rows and filter locally
       try {
@@ -338,7 +393,7 @@ class SimpleSeaTableClient {
         console.log('[SeaTable] Local filtering successful, filtered rows:', filtered.length);
         return filtered;
       } catch (fallbackErr) {
-        console.error('[SeaTable] Both SQL and local filtering failed');
+        console.error('[SeaTable] Both SQL and local filtering failed', fallbackErr);
         return [];
       }
     }
@@ -363,13 +418,12 @@ class SimpleSeaTableClient {
       
       // Map the results to use column names instead of keys AND map option values
       const mappedRows = rawRows.map(row => {
-        const mappedRow: any = {};
+        const mappedRow: SeaTableRow = { _id: row._id };
         
         // Map each column key to its name and convert option IDs to display values
         tableStructure.columns.forEach(column => {
-          if (row.hasOwnProperty(column.key)) {
+          if (hasOwn(row, column.key)) {
             const rawValue = row[column.key];
-            // Map option IDs to display values
             const mappedValue = mapOptionValues(rawValue, column);
             mappedRow[column.name] = mappedValue;
           }
@@ -377,7 +431,7 @@ class SimpleSeaTableClient {
         
         // Keep the special system fields
         ['_id', '_ctime', '_mtime', '_creator', '_last_modifier', '_locked', '_locked_by', '_archived'].forEach(field => {
-          if (row.hasOwnProperty(field)) {
+          if (hasOwn(row, field)) {
             mappedRow[field] = row[field];
           }
         });
@@ -388,14 +442,9 @@ class SimpleSeaTableClient {
       console.log('[SeaTable] Successfully mapped rows with option values:', mappedRows.length);
       return mappedRows;
       
-    } catch (err: any) {
-      console.error('[SeaTable] Error fetching table rows with mapping:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        url: err.config?.url
-      });
-      throw err;
+    } catch (err: unknown) {
+      logAxiosError('[SeaTable] Error fetching table rows with mapping:', err);
+      throw err instanceof Error ? err : new Error('Unknown error mapping table rows');
     }
   }
 
@@ -453,14 +502,14 @@ class SimpleSeaTableClient {
       console.log('[SeaTable-Debug] SQL-Abfrage erfolgreich, Ergebnisse gefunden:', results.length);
       
       // Map the results back to use column names instead of keys AND map option values
-      const mappedResults = results.map(row => {
-        const mappedRow: any = {};
+      const mappedResults = results.map(resultRow => {
+        const typedRow = resultRow as SeaTableRow;
+        const mappedRow: SeaTableRow = { _id: typedRow._id };
         
         // Map each column key back to its name and convert option IDs to display values
         tableStructure.columns.forEach(column => {
-          if (row.hasOwnProperty(column.key)) {
-            const rawValue = row[column.key];
-            // Map option IDs to display values
+          if (hasOwn(typedRow, column.key)) {
+            const rawValue = typedRow[column.key];
             const mappedValue = mapOptionValues(rawValue, column);
             mappedRow[column.name] = mappedValue;
           }
@@ -468,8 +517,8 @@ class SimpleSeaTableClient {
         
         // Keep the special system fields
         ['_id', '_ctime', '_mtime', '_creator', '_last_modifier', '_locked', '_locked_by', '_archived'].forEach(field => {
-          if (row.hasOwnProperty(field)) {
-            mappedRow[field] = row[field];
+          if (hasOwn(typedRow, field)) {
+            mappedRow[field] = typedRow[field];
           }
         });
         
@@ -479,14 +528,9 @@ class SimpleSeaTableClient {
       console.log('[SeaTable-Debug] Gemappte Ergebnisse mit Optionen:', mappedResults.length);
       return mappedResults;
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[SeaTable-Debug] SQL-Abfrage mit Mapping fehlgeschlagen, versuche Fallback...');
-      console.error('[SeaTable-Debug] Details des SQL-Fehlers:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message,
-        error_message_from_seatable: err.response?.data?.error_message // Oft die wichtigste Info
-      });
+      logAxiosError('[SeaTable-Debug] Details des SQL-Fehlers:', err);
       
       // Fallback: Get all rows with mapping and filter locally
       try {
@@ -510,7 +554,7 @@ class SimpleSeaTableClient {
         console.log('[SeaTable-Debug] Lokale Filterung erfolgreich, gefilterte Zeilen:', filtered.length);
         return filtered;
       } catch (fallbackErr) {
-        console.error('[SeaTable-Debug] Sowohl SQL-Abfrage als auch lokale Filterung fehlgeschlagen');
+        console.error('[SeaTable-Debug] Sowohl SQL-Abfrage als auch lokale Filterung fehlgeschlagen', fallbackErr);
         return [];
       }
     }
@@ -556,14 +600,15 @@ class SimpleSeaTableClient {
       
       return this.metadata;
       
-    } catch (err: any) {
-      console.error('[SeaTable] Error fetching metadata:', err);
-      throw new Error(`Failed to fetch metadata: ${err.message}`);
+    } catch (err: unknown) {
+      logAxiosError('[SeaTable] Error fetching metadata:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      throw new Error(`Failed to fetch metadata: ${message}`);
     }
   }
 
   // Update a row - UPDATED FOR API-GATEWAY
-  async updateRow(tableName: string, rowId: string, data: Record<string, any>): Promise<boolean> {
+  async updateRow(tableName: string, rowId: string, data: SeaTableRowUpdate): Promise<boolean> {
     try {
       await this.ensureValidToken();
       
@@ -593,13 +638,8 @@ class SimpleSeaTableClient {
       
       return false;
       
-    } catch (err: any) {
-      console.error('[SeaTable] Error updating row:', {
-        status: err.response?.status,
-        statusText: err.response?.statusText,
-        data: err.response?.data,
-        url: err.config?.url
-      });
+    } catch (err: unknown) {
+      logAxiosError('[SeaTable] Error updating row:', err);
       return false;
     }
   }
@@ -609,7 +649,7 @@ class SimpleSeaTableClient {
     try {
       const metadata = await this.getMetadata();
       return metadata.metadata.tables?.find(t => t.name === tableName) || null;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[SeaTable] Error getting table structure for ${tableName}:`, err);
       return null;
     }
@@ -622,7 +662,7 @@ class SimpleSeaTableClient {
       const tables = metadata.metadata.tables?.map(t => t.name) || [];
       console.log('[SeaTable] Found tables:', tables);
       return tables;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[SeaTable] Error listing tables from metadata:', err);
       return [];
     }
@@ -662,9 +702,10 @@ class SimpleSeaTableClient {
       }
       
       return { success: true, message: 'All tests passed' };
-    } catch (error: any) {
-      console.error('[SeaTable Debug] ❌ Connection test failed:', error);
-      return { success: false, message: error.message };
+    } catch (error: unknown) {
+      logAxiosError('[SeaTable Debug] ❌ Connection test failed:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, message };
     }
   }
 
@@ -686,12 +727,8 @@ class SimpleSeaTableClient {
       console.log('[SeaTable] API token test successful:', response.status);
       console.log('[SeaTable] Response:', response.data);
       return true;
-    } catch (err: any) {
-      console.error('[SeaTable] API token test failed:', {
-        status: err.response?.status,
-        data: err.response?.data,
-        message: err.message
-      });
+    } catch (err: unknown) {
+      logAxiosError('[SeaTable] API token test failed:', err);
       return false;
     }
   }
@@ -728,7 +765,7 @@ export const seatableClient = {
   listTables: () => 
     simpleClient.listTables(),
   
-  updateRow: (tableName: string, rowId: string, data: Record<string, any>) => 
+  updateRow: (tableName: string, rowId: string, data: SeaTableRowUpdate) => 
     simpleClient.updateRow(tableName, rowId, data),
 
   // Update convenience methods to use new mapping
@@ -739,13 +776,13 @@ export const seatableClient = {
     try {
       const rows = await simpleClient.getFilteredRowsWithMapping(tableName, idField, mentorId);
       return rows.length > 0 ? rows[0] : null;
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[SeaTable] Error getting mentor by ID ${mentorId}:`, err);
       return null;
     }
   },
 
-  updateMentorField: async (mentorId: string, field: string, value: any, options: { tableName?: string; idField?: string } = {}) => {
+  updateMentorField: async (mentorId: string, field: string, value: unknown, options: { tableName?: string; idField?: string } = {}) => {
     const tableName = options.tableName || 'Neue_MentorInnen';
     const idField = options.idField || 'Mentor_ID';
     
@@ -756,14 +793,15 @@ export const seatableClient = {
       }
       
       const rowId = rows[0]._id;
-      return await simpleClient.updateRow(tableName, rowId, { [field]: value });
-    } catch (err) {
+      const updatePayload: SeaTableRowUpdate = { [field]: value };
+      return await simpleClient.updateRow(tableName, rowId, updatePayload);
+    } catch (err: unknown) {
       console.error(`[SeaTable] Error updating mentor field ${field}:`, err);
       return false;
     }
   },
 
-  updateMentor: async (mentorId: string, data: Record<string, any>, options: { tableName?: string; idField?: string } = {}) => {
+  updateMentor: async (mentorId: string, data: SeaTableRowUpdate, options: { tableName?: string; idField?: string } = {}) => {
     const tableName = options.tableName || 'Neue_MentorInnen';
     const idField = options.idField || 'Mentor_ID';
     
@@ -775,7 +813,7 @@ export const seatableClient = {
       
       const rowId = rows[0]._id;
       return await simpleClient.updateRow(tableName, rowId, data);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(`[SeaTable] Error updating mentor:`, err);
       return false;
     }
@@ -816,7 +854,7 @@ export const seatableClient = {
       }
       
       return 'Neue_MentorInnen';
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('[SeaTable] Error detecting mentor table:', err);
       return 'Neue_MentorInnen';
     }
@@ -830,7 +868,7 @@ export const seatableClient = {
       const columnNames = structure.columns.map(c => c.name);
       const idFields = [mappingOptions?.idField, 'Mentor_ID', 'user_id', 'id'].filter(Boolean);
       return idFields.some(field => columnNames.includes(field as string));
-    } catch (err) {
+    } catch (err: unknown) {
       return false;
     }
   },
@@ -840,9 +878,9 @@ export const seatableClient = {
       const results = await simpleClient.debugConnection();
       // Ensure we always return an array
       return Array.isArray(results) ? results : [results];
-    } catch (error: any) {
-      // Return an array with error object
-      return [{ error: error.message, success: false }];
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return [{ error: message, success: false }];
     }
   }
 };

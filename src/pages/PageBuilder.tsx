@@ -20,8 +20,9 @@ const PageBuilder: React.FC = () => {
         const { product, name } = await getProductPageData(id);
         setInitialData(product);
         setProductName(name);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        setError(message);
       } finally {
         setIsLoading(false);
       }

@@ -32,17 +32,18 @@ const Login = () => {
       
       // Only navigate if login was successful
       navigate("/", { replace: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login error:", err);
+      const message = err instanceof Error ? err.message : undefined;
       
       // Handle the specific "Not permitted" error
-      if (err.message?.includes('Not permitted') || err.message?.includes('Keine Berechtigung')) {
+      if (message?.includes('Not permitted') || message?.includes('Keine Berechtigung')) {
         setError(language === "en" 
           ? "You don't have permission to access this application" 
           : "Sie haben keine Berechtigung für diese Anwendung");
       } else {
         // Handle other errors
-        setError(err.message || (language === "en" 
+        setError(message || (language === "en" 
           ? "Login failed" 
           : "Anmeldung fehlgeschlagen"));
       }

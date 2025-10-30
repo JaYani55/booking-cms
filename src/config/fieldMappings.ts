@@ -58,10 +58,14 @@ export const FIELD_MAPPINGS = {
 };
 
 // Helper function to get field data with fallback
-export const getField = (data: any, fieldKey: keyof typeof FIELD_MAPPINGS, fallback?: any) => {
+export const getField = (
+  data: Record<string, unknown> | null | undefined,
+  fieldKey: keyof typeof FIELD_MAPPINGS,
+  fallback?: unknown
+): unknown => {
   if (!data) return fallback;
   const fieldName = FIELD_MAPPINGS[fieldKey];
-  return data[fieldName] !== undefined ? data[fieldName] : fallback;
+  return data[fieldName] ?? fallback;
 };
 
 // Helper to map SeaTable field categories for organized display

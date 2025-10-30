@@ -1,4 +1,3 @@
-import React from "react";
 import { FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ProductApprovedMentorSelector } from "../ProductApprovedMentorSelector";
 
@@ -14,11 +13,7 @@ export function ProductApprovedMentorSelectSection({ form, selectedProduct, appr
     );
   }
 
-  // Memoize the array so it doesn't change on every render
-  const approvedMentorIds = React.useMemo(
-    () => approvedMentorNames.map(m => m.id),
-    [approvedMentorNames]
-  );
+  const approvedMentorIds = approvedMentorNames.map((mentor) => mentor.id);
 
   return (
     <FormField

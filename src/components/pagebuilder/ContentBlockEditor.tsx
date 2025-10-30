@@ -1,4 +1,5 @@
 import React from 'react';
+import type { UseFormReturn, FieldValues } from 'react-hook-form';
 import { ContentBlock } from '@/types/pagebuilder';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ interface ContentBlockEditorProps {
   block: ContentBlock;
   path: string;
   onRemove: () => void;
-  form: any;
+  form: UseFormReturn<FieldValues>;
 }
 
 export const ContentBlockEditor: React.FC<ContentBlockEditorProps> = ({

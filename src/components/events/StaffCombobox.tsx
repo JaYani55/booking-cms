@@ -165,7 +165,7 @@ export function StaffCombobox({
   };
 
   // Remove staff member from selection
-  const removeStaff = (staffId: string, e: React.MouseEvent) => {
+  const removeStaff = (staffId: string, e: React.SyntheticEvent) => {
     e.stopPropagation();
     const newValue = value.filter(id => id !== staffId);
     onChange(newValue);
@@ -233,7 +233,7 @@ export function StaffCombobox({
                       onClick={(e) => removeStaff(member.user_id, e)}
                       aria-label={language === "en" ? "Remove staff" : "Mitarbeiter entfernen"}
                       onKeyDown={e => {
-                        if (e.key === "Enter" || e.key === " ") removeStaff(member.user_id, e as any);
+                        if (e.key === "Enter" || e.key === " ") removeStaff(member.user_id, e);
                       }}
                     >
                       <X className="h-3 w-3 text-gray-500 hover:text-red-500 transition-colors" />

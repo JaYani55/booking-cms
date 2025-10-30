@@ -1,18 +1,31 @@
 import { useState, useEffect } from 'react';
 import { Event } from "@/types/event";
-import { UserRole } from '@/types/auth';
+import { User, UserRole } from '@/types/auth';
 
-
-export const useEventAcceptance = (user: any, events: Event[] | null) => {
+export const useEventAcceptance = (user: User | null, events: Event[] | null) => {
   const [newAcceptedEventIds, setNewAcceptedEventIds] = useState<string[]>([]);
 
   
   useEffect(() => {
-    if (!user || !events || user.role !== UserRole.MENTOR) return;
-    
+    if (!user || user.role !== UserRole.MENTOR || !events) {
+      setNewAcceptedEventIds([]);
+      return;
+    }
+
     const storageKey = `acceptedEvents_${user.id}`;
     const storedIds = localStorage.getItem(storageKey);
-    const previouslyAcceptedEventIds = storedIds ? JSON.parse(storedIds) : [];
+    let previouslyAcceptedEventIds: string[] = [];
+
+    if (storedIds) {
+      try {
+        const parsed = JSON.parse(storedIds);
+        if (Array.isArray(parsed)) {
+          previouslyAcceptedEventIds = parsed.filter((id): id is string => typeof id === 'string');
+        }
+      } catch (error) {
+        console.warn('[useEventAcceptance] Failed to parse stored event ids', error);
+      }
+    }
     
     // Get currently accepted events
     const currentAcceptedEventIds = events
@@ -26,7 +39,6 @@ export const useEventAcceptance = (user: any, events: Event[] | null) => {
     // Update local storage with current state
     localStorage.setItem(storageKey, JSON.stringify(currentAcceptedEventIds));
     
-    // Set state to newly accepted event ids
     setNewAcceptedEventIds(newlyAcceptedIds);
   }, [events, user]);
 

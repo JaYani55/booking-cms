@@ -13,7 +13,7 @@ import { authHelpers } from '@/components/auth/authHelpers';
 
 interface MyJwtPayload {
   user_roles?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // Define AuthContext type
@@ -122,12 +122,17 @@ const loadAppData = async (session: Session, queryClient: QueryClient) => {
         })
       );
 
-      const staffProfiles = staffProfileUrls.reduce((acc, curr) => {
+      type StaffProfile = {
+        user_id: string;
+        profile_picture_url: string | null;
+      };
+
+      const staffProfiles = staffProfileUrls.reduce<Record<string, StaffProfile>>((acc, curr) => {
         if (curr.user_id) {
           acc[curr.user_id] = curr;
         }
         return acc;
-      }, {} as Record<string, any>);
+      }, {});
 
       // Now, attach the profile_picture_url to each event
       const eventsWithStaff = transformedEvents.map(event => {

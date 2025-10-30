@@ -11,19 +11,7 @@ function MentorSeaTableForm() {
   const [showWarning, setShowWarning] = useState(true);
   const formURL = 'https://cloud.seatable.io/dtable/forms/custom/newmentor';
   const [iframeHeight, setIframeHeight] = useState('800px');
-  
-  // Add permission check
-  if (!permissions.canManageMentors) {
-    return (
-      <div className="text-center p-6">
-        <p className="text-muted-foreground">
-          {language === 'en' 
-            ? 'You do not have permission to add mentors' 
-            : 'Sie haben keine Berechtigung, Mentoren hinzuzufügen'}
-        </p>
-      </div>
-    );
-  }
+  const canManageMentors = permissions.canManageMentors;
   
   // Responsive iframe height
   useEffect(() => {
@@ -40,6 +28,19 @@ function MentorSeaTableForm() {
     // Cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+  
+  // Add permission check
+  if (!canManageMentors) {
+    return (
+      <div className="text-center p-6">
+        <p className="text-muted-foreground">
+          {language === 'en' 
+            ? 'You do not have permission to add mentors' 
+            : 'Sie haben keine Berechtigung, Mentoren hinzuzufügen'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 w-full">

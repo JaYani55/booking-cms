@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'; // useState/useEffect entfernt
+import React, { useMemo } from 'react';
 import { Event } from '@/types/event';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,11 +13,11 @@ import { useData } from '@/contexts/DataContext'; // Produkte aus globalem Cache
 import { usePermissions } from '@/hooks/usePermissions';
 import { useMentorRequests } from '@/hooks/useMentorRequests';
 import { isEventInPast } from "@/utils/eventUtils";
-import { RequestButton } from "@/components/ui/RequestButton";
 import * as LucideIcons from "lucide-react";
 import { getIconByName } from "@/constants/pillaricons";
 import ConfirmationModal from '../shared/ConfirmationModal';
 import { CounterButton } from '@/components/ui/counter-button';
+import type { UserProfileRecord } from '@/types/auth';
 
 // Helper to determine if a color is "dark" (returns true for dark backgrounds)
 function isColorDark(hexColor: string): boolean {
@@ -82,22 +82,6 @@ export const EventCard = ({
 
   // Skeleton-Loader anzeigen, wenn Produkte noch laden oder Produkt nicht gefunden
   const showSkeleton = isLoadingProducts || (event.product_id && !product);
-  if (showSkeleton) {
-    return (
-      <div className="w-full min-h-[420px] max-w-xl mx-auto rounded-3xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center">
-        <span className="text-lg text-muted-foreground">{language === "en" ? "Loading event…" : "Event wird geladen…"}</span>
-      </div>
-    );
-  }
-
-  // Fallback: Event ohne Produkt
-  if (!product && event.product_id === null) {
-    return (
-      <div className="w-full min-h-[420px] max-w-xl mx-auto rounded-3xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-muted-foreground">
-        {language === "en" ? "Event without product info" : "Veranstaltung ohne Produktinformation"}
-      </div>
-    );
-  }
 
   // Produkt-Infos
   const productName = product?.name;
@@ -105,58 +89,59 @@ export const EventCard = ({
   const productGradient = product?.gradient;
   const productColor = productGradient || "#3b82f6";
   const iconUrl = productIconName ? getIconByName(productIconName, theme === "dark") : undefined;
-  const firstColor = extractFirstColor(productGradient) || "#3b82f6";
-  const useWhiteText = isColorDark(firstColor);
+  const firstColor = extractFirstColor(productGradient);
+  const shouldUseWhiteText = isColorDark(firstColor);
+  const [staffProfile, setStaffProfile] = React.useState<UserProfileRecord | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = React.useState<boolean>(false);
+  const [confirmModalOpen, setConfirmModalOpen] = React.useState<boolean>(false);
 
-  // DECLARE isPastEvent FIRST, before any other variables that might use it
   const isPastEvent = useMemo(() => isEventInPast(event), [event]);
-  
-  // State declarations
-  const [staffProfile, setStaffProfile] = React.useState<any>(null);
-  const [isLoadingProfile, setIsLoadingProfile] = React.useState(false);
-  const [confirmModalOpen, setConfirmModalOpen] = React.useState(false);
 
   
   // Now declare other computed values that depend on isPastEvent
   const hasAlreadyRequested = event.requestingMentors?.includes(userId || '') || false;
+  const acceptedMentorCount = event.acceptedMentors?.length ?? 0;
   const isAcceptedMentor = event.acceptedMentors?.includes(userId || '') || false;
   const isDeclinedMentor = event.declinedMentors?.includes(userId || '') || false;
   
   // Load staff profile effect
   React.useEffect(() => {
     const loadStaffProfile = async () => {
-      if (event.primaryStaffId && canViewStaffProfiles) {
-        setIsLoadingProfile(true);
-        try {
-          const profile = await getUserProfile(event.primaryStaffId);
-          setStaffProfile(profile);
-        } catch (error) {
-          console.error('Error loading staff profile:', error);
-        } finally {
-          setIsLoadingProfile(false);
-        }
+      if (!event.primaryStaffId || !canViewStaffProfiles || showSkeleton) {
+        setIsLoadingProfile(false);
+        setStaffProfile(null);
+        return;
+      }
+
+      setIsLoadingProfile(true);
+      try {
+        const profile = await getUserProfile(event.primaryStaffId);
+        setStaffProfile(profile);
+      } catch (error) {
+        console.error('Error loading staff profile:', error);
+        setStaffProfile(null);
+      } finally {
+        setIsLoadingProfile(false);
       }
     };
 
-    loadStaffProfile();
-  }, [event.primaryStaffId, canViewStaffProfiles, getUserProfile]);
+    void loadStaffProfile();
+  }, [event.primaryStaffId, canViewStaffProfiles, getUserProfile, showSkeleton]);
 
-  
   const canRequest = useMemo(() => {
     if (!userId || isPastEvent) return false;
     if (hasAlreadyRequested || isAcceptedMentor || isDeclinedMentor) return false;
-    if ((event.acceptedMentors?.length || 0) >= event.amount_requiredmentors) return false;
+    if (acceptedMentorCount >= event.amount_requiredmentors) return false;
     if (!canRequestMentor(event, userId)) return false; // <-- FIX: call the function with arguments
     return true;
   }, [
-    userId, 
-    isPastEvent, 
-    hasAlreadyRequested, 
-    isAcceptedMentor, 
-    isDeclinedMentor, 
-    event.acceptedMentors?.length, 
-    event.amount_requiredmentors,
-    canRequestMentor, // <-- Add this dependency
+    userId,
+    isPastEvent,
+    hasAlreadyRequested,
+    isAcceptedMentor,
+    isDeclinedMentor,
+    acceptedMentorCount,
+    canRequestMentor,
     event,
   ]);
 
@@ -182,6 +167,23 @@ export const EventCard = ({
     }
   }, [eventDate, language]);
 
+  if (showSkeleton) {
+    return (
+      <div className="w-full min-h-[420px] max-w-xl mx-auto rounded-3xl bg-gray-100 dark:bg-gray-800 animate-pulse flex items-center justify-center">
+        <span className="text-lg text-muted-foreground">{language === "en" ? "Loading event…" : "Event wird geladen…"}</span>
+      </div>
+    );
+  }
+
+  // Fallback: Event ohne Produkt
+  if (!product && event.product_id === null) {
+    return (
+      <div className="w-full min-h-[420px] max-w-xl mx-auto rounded-3xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-muted-foreground">
+        {language === "en" ? "Event without product info" : "Veranstaltung ohne Produktinformation"}
+      </div>
+    );
+  }
+
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger card click if clicking on buttons
     if ((e.target as HTMLElement).closest('button')) {
@@ -204,9 +206,6 @@ export const EventCard = ({
       onEventClick(event);
     }
   };
-
-  // Determine text color for product name
-  const useWhiteTextFallback = isColorDark(firstColor);
 
   return (
     <Card
@@ -242,8 +241,8 @@ export const EventCard = ({
         <span
           className="font-semibold text-lg text-center"
           style={{
-            color: useWhiteTextFallback ? "#fff" : "#111",
-            textShadow: useWhiteTextFallback ? "0 1px 4px rgba(0,0,0,0.18)" : "none"
+            color: shouldUseWhiteText ? "#fff" : "#111",
+            textShadow: shouldUseWhiteText ? "0 1px 4px rgba(0,0,0,0.18)" : "none"
           }}
         >
           {productName}

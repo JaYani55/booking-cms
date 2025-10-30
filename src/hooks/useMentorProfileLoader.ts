@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Event } from '@/types/event';
+import type { UserProfileRecord } from '@/types/auth';
 
 type MentorProfile = {
   id: string;
@@ -15,7 +16,7 @@ type MentorAction = {
 
 export const useMentorProfileLoader = (
   event: Event | null,
-  getUserProfile: (userId: string) => Promise<any>
+  getUserProfile: (userId: string) => Promise<UserProfileRecord | null>
 ) => {
   const [isLoading, setIsLoading] = useState(true);
   const [requestingMentors, setRequestingMentors] = useState<MentorAction[]>([]);
@@ -25,14 +26,16 @@ export const useMentorProfileLoader = (
   useEffect(() => {
     if (!event) {
       setIsLoading(false);
+      setRequestingMentors([]);
+      setAcceptedMentorProfiles([]);
+      setDeclinedMentorProfiles([]);
       return;
     }
 
     const loadMentorProfiles = async () => {
       setIsLoading(true);
       try {
-        // Load requesting mentors
-        if (event.requestingMentors?.length > 0) {
+        if (event.requestingMentors?.length) {
           const requestingProfiles = await Promise.all(
             event.requestingMentors.map(async (mentorId) => {
               const profile = await getUserProfile(mentorId);
@@ -48,15 +51,14 @@ export const useMentorProfileLoader = (
           setRequestingMentors([]);
         }
 
-        // Load accepted mentors
-        if (event.acceptedMentors?.length > 0) {
+        if (event.acceptedMentors?.length) {
           const acceptedProfiles = await Promise.all(
             event.acceptedMentors.map(async (mentorId) => {
               const profile = await getUserProfile(mentorId);
               return {
                 id: mentorId,
                 name: profile?.Username || 'Unknown User',
-                profilePic: profile?.profilePic
+                profilePic: profile?.profile_picture_url ?? undefined
               };
             })
           );
@@ -65,15 +67,14 @@ export const useMentorProfileLoader = (
           setAcceptedMentorProfiles([]);
         }
 
-        // Load declined mentors
-        if (event.declinedMentors?.length > 0) {
+        if (event.declinedMentors?.length) {
           const declinedProfiles = await Promise.all(
             event.declinedMentors.map(async (mentorId) => {
               const profile = await getUserProfile(mentorId);
               return {
                 id: mentorId,
                 name: profile?.Username || 'Unknown User',
-                profilePic: profile?.profilePic
+                profilePic: profile?.profile_picture_url ?? undefined
               };
             })
           );
@@ -81,7 +82,6 @@ export const useMentorProfileLoader = (
         } else {
           setDeclinedMentorProfiles([]);
         }
-
       } catch (error) {
         console.error('Error loading mentor profiles:', error);
         setRequestingMentors([]);
@@ -92,14 +92,8 @@ export const useMentorProfileLoader = (
       }
     };
 
-    loadMentorProfiles();
-  }, [
-    event?.id,
-    event?.acceptedMentors?.join(','),
-    event?.requestingMentors?.join(','),
-    event?.declinedMentors?.join(','),
-    getUserProfile
-  ]);
+    void loadMentorProfiles();
+  }, [event, getUserProfile]);
 
   const updateRequestingMentors = (mentors: MentorAction[]) => {
     setRequestingMentors(mentors);

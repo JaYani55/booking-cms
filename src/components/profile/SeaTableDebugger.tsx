@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -34,38 +34,10 @@ export const SeaTableDebugger = () => {
   const [error, setError] = useState<string | null>(null);
   const [authStep, setAuthStep] = useState<'api_token' | 'base_token' | 'metadata'>('api_token');
 
-  // Initialize data on component mount
-  useEffect(() => {
-    checkToken();
-  }, []);
-  
+  const getErrorMessage = (err: unknown) =>
+    err instanceof Error ? err.message : 'Unknown error';
+
   // Check if we have a valid token
-  const checkToken = async () => {
-    try {
-      const tokenInfo = seatableClient.getTokenInfo();
-      
-      if (tokenInfo.hasToken) {
-        try {
-          // Get current auth data
-          const { axiosInstance, baseUuid, serverUrl } = await seatableClient.getAxiosInstance();
-          
-          // Use a placeholder since we can't access the actual token
-          setBaseToken("***** Token Available (Hidden) *****");
-          setBaseUuid(baseUuid);
-          setServerUrl(serverUrl);
-          setBaseTokenExpiry(tokenInfo.expires);
-          setAuthStep('base_token');
-          
-          // Try to fetch metadata
-          await fetchMetadata();
-        } catch (err) {
-          // Error initializing with stored token
-        }
-      }
-    } catch (err) {
-      // Error checking token
-    }
-  };
 
   // Step 1: Generate Base Token using API Token
   const generateBaseToken = async () => {
@@ -92,48 +64,31 @@ export const SeaTableDebugger = () => {
         title: "Base Token Generated",
         description: "Successfully generated a new base token",
       });
-    } catch (err: any) {
-      setError(`Error generating Base Token: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      setError(`Error generating Base Token: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
   };
 
   // Step 2: Get Metadata using Base Token
-  const fetchMetadata = async (forceRefresh = false) => {
-    setIsLoading(true);
-    setError(null);
-    
+  // Fetch data for a specific table
+  const fetchTableData = useCallback(async (tableName: string) => {
     try {
-      const metadataResult = await seatableClient.getMetadata(forceRefresh);
-      setMetadata(metadataResult);
-      setAuthStep('metadata');
-      
-      // Extract table list
-      if (metadataResult?.metadata?.tables) {
-        const tables = metadataResult.metadata.tables.map(table => table.name);
-        setTableList(tables);
-        
-        // If we have tables and none is selected, select the first one
-        if (tables.length > 0 && !selectedTable) {
-          setSelectedTable(tables[0]);
-          await fetchTableStructure(tables[0]);
-        }
-      }
+      const rows = await seatableClient.getTableRows(tableName);
+      setTableData(rows);
       
       toast({
-        title: "Metadata Loaded",
-        description: `Found ${metadataResult?.metadata?.tables?.length || 0} tables`,
+        title: `Table Data Loaded`,
+        description: `Loaded ${rows.length} rows from ${tableName}`,
       });
-    } catch (err: any) {
-      setError(`Error fetching metadata: ${err.message || 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
+    } catch (err: unknown) {
+      setError(`Error fetching table data: ${getErrorMessage(err)}`);
     }
-  };
-  
+  }, [toast]);
+
   // Fetch structure for a specific table
-  const fetchTableStructure = async (tableName: string) => {
+  const fetchTableStructure = useCallback(async (tableName: string) => {
     setIsLoading(true);
     setTableData(null);
     
@@ -145,27 +100,70 @@ export const SeaTableDebugger = () => {
       if (structure) {
         await fetchTableData(tableName);
       }
-    } catch (err: any) {
-      setError(`Error fetching table structure: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      setError(`Error fetching table structure: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  // Fetch data for a specific table
-  const fetchTableData = async (tableName: string) => {
+  }, [fetchTableData]);
+
+  const fetchMetadata = useCallback(async (forceRefresh = false) => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
-      const rows = await seatableClient.getTableRows(tableName);
-      setTableData(rows);
+      const metadataResult = await seatableClient.getMetadata(forceRefresh);
+      setMetadata(metadataResult);
+      setAuthStep('metadata');
+      
+      if (metadataResult?.metadata?.tables) {
+        const tables = metadataResult.metadata.tables.map(table => table.name);
+        setTableList(tables);
+        
+        if (tables.length > 0 && !selectedTable) {
+          setSelectedTable(tables[0]);
+          await fetchTableStructure(tables[0]);
+        }
+      }
       
       toast({
-        title: `Table Data Loaded`,
-        description: `Loaded ${rows.length} rows from ${tableName}`,
+        title: "Metadata Loaded",
+        description: `Found ${metadataResult?.metadata?.tables?.length || 0} tables`,
       });
-    } catch (err: any) {
-      setError(`Error fetching table data: ${err.message || 'Unknown error'}`);
+    } catch (err: unknown) {
+      setError(`Error fetching metadata: ${getErrorMessage(err)}`);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [fetchTableStructure, selectedTable, toast]);
+
+  const checkToken = useCallback(async () => {
+    try {
+      const tokenInfo = seatableClient.getTokenInfo();
+
+      if (tokenInfo.hasToken) {
+        try {
+          const { baseUuid, serverUrl } = await seatableClient.getAxiosInstance();
+
+          setBaseToken("***** Token Available (Hidden) *****");
+          setBaseUuid(baseUuid);
+          setServerUrl(serverUrl);
+          setBaseTokenExpiry(tokenInfo.expires);
+          setAuthStep('base_token');
+
+          await fetchMetadata();
+        } catch (err: unknown) {
+          console.error('Error initializing SeaTable token from cache:', err);
+        }
+      }
+    } catch (err: unknown) {
+      console.error('Error checking SeaTable token state:', err);
+    }
+  }, [fetchMetadata]);
+
+  useEffect(() => {
+    void checkToken();
+  }, [checkToken]);
   
   // Handle table selection
   const handleTableSelect = async (tableName: string) => {
@@ -226,8 +224,8 @@ export const SeaTableDebugger = () => {
       // Update the error state to show results (using error state for display)
       setError(`Endpoint Test Results:\n${formattedResults}`);
       
-    } catch (err: any) {
-      setError(`Endpoint test failed: ${err.message}`);
+    } catch (err: unknown) {
+      setError(`Endpoint test failed: ${getErrorMessage(err)}`);
     } finally {
       setIsLoading(false);
     }
@@ -285,11 +283,12 @@ export const SeaTableDebugger = () => {
         }
       }
       
-    } catch (err: any) {
-      setError(`UUID test failed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = getErrorMessage(err);
+      setError(`UUID test failed: ${message}`);
       toast({
         title: "Test Error",
-        description: `Error: ${err.message}`,
+        description: `Error: ${message}`,
         variant: "destructive"
       });
     } finally {

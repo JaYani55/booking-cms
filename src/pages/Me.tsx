@@ -3,25 +3,28 @@ import { Link } from 'react-router-dom';
 import { Card } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { usePermissions } from '@/hooks/usePermissions'; // Add this import
 import { useProfileData } from "@/hooks/useProfileData";
 import { useSeatableMentors } from "@/hooks/useSeatableMentors";
 import { User, Settings, ChevronRight } from "lucide-react";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
 import { SeaTableProfileData } from "@/components/profile/SeaTableProfileData";
-import { ColumnMetadata } from "@/types/seaTableTypes";
+import { ColumnMetadata, SeaTableRow } from "@/types/seaTableTypes";
+
+const getStringField = (row: SeaTableRow | null | undefined, field: string): string | null => {
+  if (!row) return null;
+  const value = row[field];
+  return typeof value === 'string' && value.trim().length > 0 ? value : null;
+};
 
 const Me = () => {
   const { language } = useTheme();
   const { user: currentUser } = useAuth();
-  const permissions = usePermissions(); // Use centralized permissions
 
   // Get profile data for the current user (no URL parameter, so it uses current user)
   const {
     isLoading,
     user,
     seatableMentorData,
-    canEdit,
   } = useProfileData(language);
 
   // Get metadata for SeaTable display
@@ -43,6 +46,30 @@ const Me = () => {
     }
   }, [getTableMetadata]);
 
+  const displayUsername = useMemo(() => {
+    const username = typeof user?.Username === 'string' && user.Username.trim().length > 0
+      ? user.Username
+      : null;
+
+    if (username) {
+      return username;
+    }
+
+    const firstName = getStringField(seatableMentorData, 'Vorname');
+    const lastName = getStringField(seatableMentorData, 'Nachname');
+
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    }
+
+    const displayName = getStringField(seatableMentorData, 'Anzeigename');
+    if (displayName) {
+      return displayName;
+    }
+
+    return language === 'en' ? 'Unknown User' : 'Unbekannter Benutzer';
+  }, [language, seatableMentorData, user?.Username]);
+
   if (!currentUser) {
     return null;
   }
@@ -55,22 +82,6 @@ const Me = () => {
       href: "/settings",
     }
   ];
-
-  const getDisplayUsername = (user: any, language: 'en' | 'de') => {
-    if (user?.Username) {
-      return user.Username;
-    }
-
-    if (seatableMentorData?.Vorname && seatableMentorData?.Nachname) {
-      return `${seatableMentorData.Vorname} ${seatableMentorData.Nachname}`;
-    }
-
-    if (seatableMentorData?.Anzeigename) {
-      return seatableMentorData.Anzeigename;
-    }
-
-    return language === 'en' ? 'Unknown User' : 'Unbekannter Benutzer';
-  };
 
   return (
     <div className="space-y-6">
@@ -92,7 +103,7 @@ const Me = () => {
                 {/* Remove the ProfilePhoto component entirely */}
                 <div>
                   <h2 className="text-2xl font-bold">
-                    {getDisplayUsername(user, language)}
+                    {displayUsername}
                   </h2>
                   <p className="text-muted-foreground">
                     {currentUser.email}
@@ -111,7 +122,6 @@ const Me = () => {
                 isLoading={false}
                 language={language}
                 userId={currentUser.id}
-                canEdit={canEdit}
                 columnMetadata={columnMetadata}
               />
             ) : (

@@ -54,7 +54,7 @@ const ExpandableText: React.FC<{ text: string }> = ({ text }) => {
 };
 
 // Format value function
-const formatValue = (value: any, fieldName: string, columnType?: string): React.ReactNode => {
+const formatValue = (value: unknown, _fieldName: string, columnType?: string): React.ReactNode => {
   if (value === null || value === undefined || value === '') {
     return <span className="text-gray-400 italic">Not specified</span>;
   }
@@ -106,7 +106,7 @@ const formatValue = (value: any, fieldName: string, columnType?: string): React.
     );
   }
 
-  if (typeof value === 'string' && /^[+]?[\d\s\-\(\)]+$/.test(value) && value.length > 5) {
+  if (typeof value === 'string' && /^[+]?[\d\s()-]+$/.test(value) && value.length > 5) {
     return (
       <a 
         href={`tel:${value.replace(/\s/g, '')}`} 
@@ -117,13 +117,26 @@ const formatValue = (value: any, fieldName: string, columnType?: string): React.
     );
   }
 
-  if (columnType === 'date' || (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))) {
-    try {
-      const date = new Date(value);
-      return date.toLocaleDateString();
-    } catch {
-      return String(value);
+  if (
+    columnType === 'date' ||
+    (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value))
+  ) {
+    if (value instanceof Date) {
+      return value.toLocaleDateString();
     }
+
+    if (typeof value === 'string' || typeof value === 'number') {
+      try {
+        const date = new Date(value);
+        if (!Number.isNaN(date.getTime())) {
+          return date.toLocaleDateString();
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+
+    return String(value);
   }
 
   if (typeof value === 'string' && value.length > 100) {
@@ -157,12 +170,12 @@ export const SeaTableProfileData: React.FC<SeaTableProfileDataProps> = ({
     if (!data) return {};
 
     const categories = {
-      personal: [] as Array<{ key: string; value: any; type?: string }>,
-      contact: [] as Array<{ key: string; value: any; type?: string }>,
-      professional: [] as Array<{ key: string; value: any; type?: string }>,
-      preferences: [] as Array<{ key: string; value: any; type?: string }>,
-      administrative: [] as Array<{ key: string; value: any; type?: string }>,
-      other: [] as Array<{ key: string; value: any; type?: string }>
+      personal: [] as Array<{ key: string; value: unknown; type?: string }>,
+      contact: [] as Array<{ key: string; value: unknown; type?: string }>,
+      professional: [] as Array<{ key: string; value: unknown; type?: string }>,
+      preferences: [] as Array<{ key: string; value: unknown; type?: string }>,
+      administrative: [] as Array<{ key: string; value: unknown; type?: string }>,
+      other: [] as Array<{ key: string; value: unknown; type?: string }>
     };
 
     Object.entries(data).forEach(([key, value]) => {

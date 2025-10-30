@@ -58,11 +58,10 @@ export const LoadingState = ({
   const usedFacts = useRef<number[]>([]);
 
   useEffect(() => {
-    let showFactTimeout: NodeJS.Timeout;
-    let factInterval: NodeJS.Timeout;
+    let factInterval: NodeJS.Timeout | undefined;
 
     // Show first fact after 5 seconds
-    showFactTimeout = setTimeout(() => {
+    const showFactTimeout = setTimeout(() => {
       setShowFact(true);
       // Pick a random fact to start
       setFactIndex(Math.floor(Math.random() * FACTS.length));
@@ -83,7 +82,9 @@ export const LoadingState = ({
 
     return () => {
       clearTimeout(showFactTimeout);
-      clearInterval(factInterval);
+      if (factInterval) {
+        clearInterval(factInterval);
+      }
     };
   }, []);
 

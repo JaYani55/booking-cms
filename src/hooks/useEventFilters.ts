@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { Event, EventStatus } from '@/types/event';
-import { UserRole } from '@/types/auth';
-import { fetchStaffNames } from '../utils/staffUtils';
+import { User, UserRole } from '@/types/auth';
 import { usePermissions } from './usePermissions';
 
 export type ViewMode = 'all' | 'myEvents' | 'coachEvents' | 'past';
@@ -11,7 +10,7 @@ interface UseEventFiltersProps {
   events: Event[] | null;
   viewMode: ViewMode;
   statusFilter: StatusFilterType;
-  user: any;
+  user: User | null;
   search?: string;
   sortBy?: keyof Event;
   sortDirection?: "asc" | "desc";
@@ -27,7 +26,26 @@ export const useEventFilters = ({
   sortDirection = 'desc'
 }: UseEventFiltersProps) => {
   const { canMentorViewEvent } = usePermissions();
+
   return useMemo(() => {
+    const parseEventDate = (event: Event) => new Date(`${event.date}T${event.time ?? '00:00'}`);
+
+    const compareValues = (aValue: unknown, bValue: unknown): number => {
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return aValue.getTime() - bValue.getTime();
+      }
+
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return aValue - bValue;
+      }
+
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return aValue.localeCompare(bValue, undefined, { sensitivity: 'base' });
+      }
+
+      return String(aValue ?? '').localeCompare(String(bValue ?? ''), undefined, { sensitivity: 'base' });
+    };
+
     if (!events) return { filteredEvents: [], upcomingEvents: [], pastEvents: [] };
     
     // First filter the events
@@ -78,54 +96,51 @@ export const useEventFilters = ({
     
     // Sort the filtered results
     filteredEvents = [...filteredEvents].sort((a, b) => {
-      let aValue: any = a[sortBy];
-      let bValue: any = b[sortBy];
-      
+      let aValue: unknown = a[sortBy];
+      let bValue: unknown = b[sortBy];
+
       if (sortBy === 'primaryStaffName') {
-        aValue = a.primaryStaffName || '';
-        bValue = b.primaryStaffName || '';
+        aValue = a.primaryStaffName ?? '';
+        bValue = b.primaryStaffName ?? '';
+      } else if (sortBy === 'date') {
+        aValue = parseEventDate(a);
+        bValue = parseEventDate(b);
       }
-      
-      if (sortBy === 'date') {
-        aValue = new Date(a.date + ' ' + a.time);
-        bValue = new Date(b.date + ' ' + b.time);
-      }
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        const comparison = aValue.localeCompare(bValue);
-        return sortDirection === 'asc' ? comparison : -comparison;
-      }
-      
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
-      return 0;
+
+      const comparison = compareValues(aValue, bValue);
+      return sortDirection === 'asc' ? comparison : -comparison;
     });
 
     // Split into upcoming and past events
     const now = new Date();
-    let upcomingEvents = filteredEvents.filter(event => new Date(event.date) >= now);
-    let pastEvents = filteredEvents.filter(event => new Date(event.date) < now);
-    
-    upcomingEvents = upcomingEvents.sort((a, b) => {
-      const dateA = new Date(a.date + 'T' + a.time);
-      const dateB = new Date(b.date + 'T' + b.time);
-      return sortDirection === 'asc'
-        ? dateA.getTime() - dateB.getTime()
-        : dateB.getTime() - dateA.getTime();
-    });
-    
-    pastEvents = pastEvents.sort((a, b) => {
-      const dateA = new Date(a.date + 'T' + a.time);
-      const dateB = new Date(b.date + 'T' + b.time);
-      return sortDirection === 'asc'
-        ? dateA.getTime() - dateB.getTime()
-        : dateB.getTime() - dateA.getTime();
-    });
+    let upcomingEvents = filteredEvents.filter(event => parseEventDate(event) >= now);
+    let pastEvents = filteredEvents.filter(event => parseEventDate(event) < now);
+
+    const sortByDate = (list: Event[]) =>
+      [...list].sort((eventA, eventB) => {
+        const dateA = parseEventDate(eventA);
+        const dateB = parseEventDate(eventB);
+        const comparison = dateA.getTime() - dateB.getTime();
+        return sortDirection === 'asc' ? comparison : -comparison;
+      });
+
+    upcomingEvents = sortByDate(upcomingEvents);
+    pastEvents = sortByDate(pastEvents);
 
     return {
       filteredEvents,
       upcomingEvents,
       pastEvents
     };
-  }, [events, viewMode, statusFilter, user, search, sortBy, sortDirection, canMentorViewEvent]);
+  }, [
+    events,
+    viewMode,
+    statusFilter,
+    user?.id,
+    user?.role,
+    search,
+    sortBy,
+    sortDirection,
+    canMentorViewEvent
+  ]);
 };

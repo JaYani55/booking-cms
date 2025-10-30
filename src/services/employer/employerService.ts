@@ -3,8 +3,10 @@ import { supabase } from '../../lib/supabase';
 export interface Employer {
   id: string;
   name: string;
-  logo_url?: string;
+  logo_url: string | null;
 }
+
+type EmployerSummary = Pick<Employer, 'id' | 'name'>;
 
 // Replace your searchEmployers function with this simplified version
 export const searchEmployers = async (query: string): Promise<Employer[]> => {
@@ -16,7 +18,7 @@ export const searchEmployers = async (query: string): Promise<Employer[]> => {
     console.log("Searching with query:", query);
     
     const { data, error } = await supabase
-      .from('employers')
+      .from<Employer>('employers')
       .select('id, name, logo_url')
       .ilike('name', `%${query.trim()}%`)
       .limit(10);
@@ -39,7 +41,7 @@ export const getEmployerById = async (id: string): Promise<Employer | null> => {
 
   try {
     const { data, error } = await supabase
-      .from('employers')
+      .from<Employer>('employers')
       .select('id, name, logo_url')
       .eq('id', id)
       .single();
@@ -56,18 +58,36 @@ export const getEmployerById = async (id: string): Promise<Employer | null> => {
   }
 };
 
-export const testDirectEmployerQuery = async (): Promise<any> => {
+export interface EmployerQueryTestResult {
+  success: boolean;
+  count: number;
+  data: EmployerSummary[];
+  error: unknown;
+}
+
+export const testDirectEmployerQuery = async (): Promise<EmployerQueryTestResult> => {
   try {
     // Test basic connection and permissions
     const { data, error } = await supabase
-      .from('employers')
+      .from<EmployerSummary>('employers')
       .select('id, name')
       .limit(3);
     
     console.log("Direct query test results:", { data, error });
-    return { success: !error, count: data?.length || 0, data, error };
+    const resultData = data ?? [];
+    return {
+      success: !error,
+      count: resultData.length,
+      data: resultData,
+      error: error ?? null,
+    };
   } catch (err) {
     console.error("Direct query test failed:", err);
-    return { success: false, error: err };
+    return {
+      success: false,
+      count: 0,
+      data: [],
+      error: err,
+    };
   }
 };

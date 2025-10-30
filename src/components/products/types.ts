@@ -51,6 +51,13 @@ export interface ProductInfo {
   name: string;
   icon_name?: string;
   gradient?: string;
-  description_de: string;
-  description_effort: string;
+  description_de?: string;
+  description_effort?: string;
+  assigned_groups?: number[];
+  salary_type?: Product['salary_type'];
+  salary?: number;
+  min_amount_mentors?: number;
+  max_amount_mentors?: number;
+  approved?: string[];
+  is_mentor_product?: boolean;
 }

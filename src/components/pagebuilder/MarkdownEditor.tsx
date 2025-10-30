@@ -44,7 +44,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
       const html = editor.getHTML();
       
       // Convert HTML to markdown format with better handling
-      let markdown = html
+  const markdown = html
         // Handle nested formatting (strong inside p, em inside p, etc.)
         .replace(/<p><strong>(.*?)<\/strong><\/p>/g, '**$1**\n\n')
         .replace(/<p><em>(.*?)<\/em><\/p>/g, '*$1*\n\n')

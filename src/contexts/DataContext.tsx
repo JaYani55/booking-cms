@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useMemo } from 'react'; // <-- Füge useMemo hinzu
+import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Event } from '@/types/event';
 import { useAuth } from './AuthContext';
@@ -9,6 +9,8 @@ import { fetchStaffNames } from '../utils/staffUtils';
 import { fetchProducts, Product } from '@/services/events/productService';
 // NEU: Importiere ensureProductGradient
 import { ensureProductGradient } from '@/services/events/productService';
+import type { UserProfileRecord } from '@/types/auth';
+import type { SeaTableRow, SeaTableRowUpdate } from '@/types/seaTableTypes';
 
 // Define types for our context
 interface DataContextType {
@@ -21,9 +23,9 @@ interface DataContextType {
   refetchEvents: () => Promise<void>;
   refetchAllData: () => Promise<void>;
   getEventById: (id: string) => Event | undefined;
-  getUserProfile: (userId: string) => Promise<any>;
-  getMentorData: (userId: string) => Promise<any>;
-  updateMentorData: (userId: string, data: any) => Promise<void>;
+  getUserProfile: (userId: string) => Promise<UserProfileRecord | null>;
+  getMentorData: (userId: string) => Promise<SeaTableRow | null>;
+  updateMentorData: (userId: string, data: SeaTableRowUpdate) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -55,95 +57,102 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // --- ENDE NEUE PRODUKT-QUERIES ---
 
   // --- ANPASSUNG fetchEventsFromAPI: ProductInfo Join entfernen ---
-  const fetchEventsFromAPI = async (): Promise<Event[]> => {
-    try {
-      const { data, error } = await supabase
-        .from('mentorbooking_events')
-        .select(`* , product_id`)
-        .order('date', { ascending: true });
+  const fetchEventsFromAPI = useCallback(async (): Promise<Event[]> => {
+    const { data, error } = await supabase
+      .from('mentorbooking_events')
+      .select(`* , product_id`)
+      .order('date', { ascending: true });
 
-      if (error) {
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        return [];
-      }
-
-      const allStaffIds = new Set<string>();
-      data.forEach(event => {
-        if (event.staff_members && Array.isArray(event.staff_members)) {
-          event.staff_members.forEach(id => {
-            if (id && typeof id === 'string') {
-              allStaffIds.add(id);
-            }
-          });
-        }
-      });
-      const staffNames = await fetchStaffNames([...allStaffIds]);
-
-      const transformedEvents = data
-        .filter(event => event && typeof event === 'object')
-        .map(event => {
-          const staffMembers = event.staff_members && Array.isArray(event.staff_members) && event.staff_members.length > 0
-            ? event.staff_members.filter(id => id && typeof id === 'string')
-            : [];
-          const primaryStaffId = staffMembers[0] || '';
-          const primaryStaffName = staffNames[primaryStaffId] || 'Unknown';
-          return {
-            id: event.id,
-            title: event.company || '',
-            employer_id: event.employer_id || '',
-            company: event.company || '',
-            date: event.date || '',
-            time: event.time || '',
-            end_time: event.end_time || '',
-            duration_minutes: event.duration_minutes || null,
-            description: event.description || '',
-            staff_members: staffMembers,
-            primaryStaffId: primaryStaffId,
-            primaryStaffName: primaryStaffName,
-            staffNames: staffMembers.map(id => staffNames[id] || 'Unknown'),
-            staffProfilePicture: event.staffProfilePicture || null,
-            status: event.status || 'new',
-            mode: event.mode || 'online',
-            requestingMentors: event.requesting_mentors || [],
-            acceptedMentors: event.accepted_mentors || [],
-            declinedMentors: event.declined_mentors || [],
-            amount_requiredmentors: event.amount_requiredmentors || 1,
-            product_id: event.product_id, // <-- Dies ist die ID, die wir jetzt nutzen
-            // ProductInfo: event.ProductInfo, // <-- Entfernt
-            teams_link: event.teams_link || '',
-            initial_selected_mentors: event.initial_selected_mentors || [],
-          };
-        });
-      return transformedEvents;
-    } catch (error) {
+    if (error) {
       throw error;
     }
-  };
 
-  // 1. Declare refetchEvents FIRST
-  const refetchEvents = async () => {
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    const allStaffIds = new Set<string>();
+    data.forEach(event => {
+      if (event.staff_members && Array.isArray(event.staff_members)) {
+        event.staff_members.forEach(id => {
+          if (id && typeof id === 'string') {
+            allStaffIds.add(id);
+          }
+        });
+      }
+    });
+    const staffNames = await fetchStaffNames([...allStaffIds]);
+
+    const transformedEvents = data
+      .filter(event => event && typeof event === 'object')
+      .map(event => {
+        const staffMembers = event.staff_members && Array.isArray(event.staff_members) && event.staff_members.length > 0
+          ? event.staff_members.filter(id => id && typeof id === 'string')
+          : [];
+        const primaryStaffId = staffMembers[0] || '';
+        const primaryStaffName = staffNames[primaryStaffId] || 'Unknown';
+        return {
+          id: event.id,
+          title: event.company || '',
+          employer_id: event.employer_id || '',
+          company: event.company || '',
+          date: event.date || '',
+          time: event.time || '',
+          end_time: event.end_time || '',
+          duration_minutes: event.duration_minutes || null,
+          description: event.description || '',
+          staff_members: staffMembers,
+          primaryStaffId: primaryStaffId,
+          primaryStaffName: primaryStaffName,
+          staffNames: staffMembers.map(id => staffNames[id] || 'Unknown'),
+          staffProfilePicture: event.staffProfilePicture || null,
+          status: event.status || 'new',
+          mode: event.mode || 'online',
+          requestingMentors: event.requesting_mentors || [],
+          acceptedMentors: event.accepted_mentors || [],
+          declinedMentors: event.declined_mentors || [],
+          amount_requiredmentors: event.amount_requiredmentors || 1,
+          product_id: event.product_id,
+          teams_link: event.teams_link || '',
+          initial_selected_mentors: event.initial_selected_mentors || [],
+        };
+      });
+    return transformedEvents;
+  }, []);
+
+  const {
+    data: events,
+    isLoading: isLoadingEvents,
+    error: eventsError,
+    refetch
+  } = useQuery({
+    queryKey: [QUERY_KEYS.EVENTS],
+    queryFn: fetchEventsFromAPI,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: false,
+    enabled: !!user && user.hasAccess
+  });
+
+  const refetchEvents = useCallback(async () => {
     try {
-      // Fetch fresh data from API
       const freshEvents = await fetchEventsFromAPI();
       queryClient.setQueryData([QUERY_KEYS.EVENTS], freshEvents || []);
       await refetch();
-      return Promise.resolve();
     } catch (error) {
       queryClient.setQueryData([QUERY_KEYS.EVENTS], []);
-      return Promise.reject(error);
+      throw error;
     }
-  };
+  }, [fetchEventsFromAPI, queryClient, refetch]);
 
-  // 2. THEN add your useEffect for realtime subscription
   useEffect(() => {
     if (!user?.hasAccess) return;
 
     const channel = supabase.channel('events_changes');
 
-    // Listen for changes in requesting_mentors
     channel.on(
       'postgres_changes',
       {
@@ -154,11 +163,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       (payload) => {
         console.log('Realtime: requesting_mentors changed', payload);
-        refetchEvents();
+        void refetchEvents();
       }
     );
 
-    // Listen for changes in accepted_mentors
     channel.on(
       'postgres_changes',
       {
@@ -169,11 +177,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       (payload) => {
         console.log('Realtime: accepted_mentors changed', payload);
-        refetchEvents();
+        void refetchEvents();
       }
     );
 
-    // Listen for changes in declined_mentors
     channel.on(
       'postgres_changes',
       {
@@ -184,7 +191,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       },
       (payload) => {
         console.log('Realtime: declined_mentors changed', payload);
-        refetchEvents();
+        void refetchEvents();
       }
     );
 
@@ -194,127 +201,88 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       channel.unsubscribe();
     };
   }, [user?.id, user?.hasAccess, refetchEvents]);
-  
-  const { 
-    data: events, 
-    isLoading: isLoadingEvents, 
-    error: eventsError,
-    refetch
-  } = useQuery({
-    queryKey: [QUERY_KEYS.EVENTS],
-    queryFn: async () => {
-      return await fetchEventsFromAPI();
-    },
-    staleTime: Infinity,
-    gcTime: Infinity,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
-    retry: false,
-    // Add permission check here
-    enabled: !!user && user.hasAccess
-  });
 
   // Add a new comprehensive data refresh function
-  const refetchAllData = async () => {
-    try {
-      await refetchProducts(); // Produkte mit aktualisieren
-      // 1. Refetch events
-      const freshEvents = await fetchEventsFromAPI();
-      queryClient.setQueryData([QUERY_KEYS.EVENTS], freshEvents || []);
-      
-      // 2. Invalidate all user profiles and SeaTable mentors data
-      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USER_PROFILE] });
-      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SEATABLE_MENTORS] }); // Fix this line
-      
-      // 3. Invalidate any other cached data as needed
-      // Add additional refresh logic for other data types
-      
-      // 4. Trigger React Query's refetch mechanism
-      await refetch();
-      
-      return Promise.resolve();
-    } catch (error) {
-      return Promise.reject(error);
-    }
-  };
+  const refetchAllData = useCallback(async () => {
+    await refetchProducts();
+    const freshEvents = await fetchEventsFromAPI();
+    queryClient.setQueryData([QUERY_KEYS.EVENTS], freshEvents || []);
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.USER_PROFILE] }),
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SEATABLE_MENTORS] })
+    ]);
+
+    await refetch();
+  }, [fetchEventsFromAPI, queryClient, refetch, refetchProducts]);
 
   // Helper to get a single event by ID from the cache
-  const getEventById = (id: string): Event | undefined => {
-    if (!events) return undefined;
-    return events.find(event => event.id === id);
-  };
+  const getEventById = useCallback((id: string): Event | undefined => {
+    return events?.find(event => event.id === id);
+  }, [events]);
 
   // Get user profile from cache or API
-  const getUserProfile = async (userId: string) => {
+  const getUserProfile = useCallback(async (userId: string): Promise<UserProfileRecord | null> => {
     try {
       const { data, error } = await supabase
         .from('user_profile')
-        .select('*')
+        .select('user_id, Username, profile_picture_url')
         .eq('user_id', userId)
-        .single();
-        
+        .single<UserProfileRecord>();
+
       if (error) {
         return null;
       }
-      
-      return data;
+
+      return data ?? null;
     } catch (error) {
+      console.error('[DataContext] Error fetching user profile:', error);
       return null;
     }
-  };
+  }, []);
 
   // Get mentor data from cache or API with SeaTable fallback
-  const getMentorData = async (userId: string) => {
+  const getMentorData = useCallback(async (userId: string): Promise<SeaTableRow | null> => {
+    const cachedData = queryClient.getQueryData<SeaTableRow>([QUERY_KEYS.SEATABLE_MENTORS, userId]);
+    if (cachedData) {
+      return cachedData;
+    }
+
     try {
-      // First check if we have this data in the cache
-      const cachedData = queryClient.getQueryData([QUERY_KEYS.SEATABLE_MENTORS, userId]);
-      if (cachedData) {
-        return cachedData;
-      }
-      
-      // If not in cache, get from SeaTable
-      // Import dynamically to avoid circular dependencies
-      const { useSeatableMentors } = await import('@/hooks/useSeatableMentors');
-      const { getMentorById } = useSeatableMentors();
-      
-      const mentorData = await getMentorById(userId);
-      
-      // Cache the data we fetched
+      const { seatableClient } = await import('@/lib/seatableClient');
+      const rows = await seatableClient.getFilteredRows('Mentors', 'Mentor_ID', userId);
+      const mentorData = rows[0] ?? null;
+
       if (mentorData) {
         queryClient.setQueryData([QUERY_KEYS.SEATABLE_MENTORS, userId], mentorData);
       }
-      
+
       return mentorData;
     } catch (error) {
-      throw error;
+      console.error('[DataContext] Error fetching mentor data:', error);
+      return null;
     }
-  };
+  }, [queryClient]);
 
   // Update mentor data
-  const updateMentorData = async (userId: string, data: any) => {
+  const updateMentorData = useCallback(async (userId: string, data: SeaTableRowUpdate) => {
     try {
-      // Update in SeaTable
-      // Import dynamically to avoid circular dependencies
       const { seatableClient } = await import('@/lib/seatableClient');
-      
-      // Get current data first to find the row ID
       const rows = await seatableClient.getFilteredRows('Mentors', 'Mentor_ID', userId);
-      
+
       if (rows.length === 0) {
         throw new Error(`User ${userId} not found in SeaTable`);
       }
-      
-      // Update the data
+
       const rowId = rows[0]._id;
       await seatableClient.updateRow('Mentors', rowId, data);
-      
-      // After successful update, refetch the data
+
       await refetchAllData();
     } catch (error) {
-      throw error;
+      console.error('[DataContext] Error updating mentor data:', error);
+      throw error instanceof Error ? error : new Error('Unknown error updating mentor data');
     }
-  };
+  }, [refetchAllData]);
 
   // Make sure the DataProvider returns JSX
   return (

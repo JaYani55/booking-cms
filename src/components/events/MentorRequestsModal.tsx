@@ -199,7 +199,9 @@ const MentorRequestsModal = ({
           await processRequest(m.id, 'decline');
         }
       }
-      onSuccess && await onSuccess();
+      if (onSuccess) {
+        await onSuccess();
+      }
       onOpenChange(false);
     } catch (error) {
       console.error('Error processing mentor actions:', error);

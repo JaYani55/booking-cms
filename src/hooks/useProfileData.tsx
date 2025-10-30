@@ -6,11 +6,49 @@ import { useSeatableMentors } from '@/hooks/useSeatableMentors';
 import { supabase } from '@/lib/supabase';
 import { SeaTableRow } from '@/types/seaTableTypes';
 
+type ProfileRow = {
+  user_id: string;
+  Username?: string | null;
+  pfp_url?: string | null;
+} & Record<string, unknown>;
+
+type RoleRow = {
+  role_id: string;
+  roles: {
+    name: string | null;
+  } | null;
+};
+
+const toProfileRow = (value: unknown): ProfileRow | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const record = value as ProfileRow;
+  return typeof record.user_id === 'string' ? record : null;
+};
+
+const extractRoleNames = (rows: unknown[] | null | undefined): string[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.flatMap((row) => {
+    if (!row || typeof row !== 'object') {
+      return [];
+    }
+
+    const { roles } = row as RoleRow;
+    const name = roles?.name;
+    return typeof name === 'string' && name.length > 0 ? [name] : [];
+  });
+};
+
 interface ProfileUser {
   id: string;
   Username?: string;
   pfp_url?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const useProfileData = (language: 'en' | 'de') => {
@@ -92,18 +130,24 @@ export const useProfileData = (language: 'en' | 'de') => {
       }
 
       // Fix: The roles property is an object, not an array
-      const userRoles = roleData?.map((r: any) => r.roles?.name).filter(Boolean) || [];
+      const userRoles = extractRoleNames(roleData);
       const isMentor = userRoles.includes('mentor');
 
       console.log('[useProfileData] User roles:', userRoles);
       console.log('[useProfileData] Is mentor:', isMentor);
 
       // Set user profile data
+      const profileRow = toProfileRow(profileData);
+
+      if (!profileRow) {
+        throw new Error('Received invalid profile data from Supabase');
+      }
+
       setUser({
         id: targetUserId,
-        Username: profileData.Username,
-        pfp_url: profileData.pfp_url,
-        ...profileData
+        Username: typeof profileRow.Username === 'string' ? profileRow.Username : undefined,
+        pfp_url: typeof profileRow.pfp_url === 'string' ? profileRow.pfp_url : undefined,
+        ...profileRow
       });
 
       // Access control logic
@@ -192,7 +236,7 @@ export const useProfileData = (language: 'en' | 'de') => {
       console.error('[useProfileData] Error updating username:', error);
       return false;
     }
-  }, [targetUserId, isOwnProfile]);
+  }, [targetUserId, isOwnProfile, canEditUsername]);
 
   // Effects
   useEffect(() => {

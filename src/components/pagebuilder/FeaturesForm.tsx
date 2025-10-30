@@ -1,5 +1,5 @@
 import React from 'react';
-import { useFormContext, useFieldArray } from 'react-hook-form';
+import { useFieldArray, type UseFormReturn, type FieldValues } from 'react-hook-form';
 import { PageBuilderData, ContentBlock } from '@/types/pagebuilder';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,7 @@ import { ContentBlockEditor } from './ContentBlockEditor';
 import { AddContentBlock } from './AddContentBlock';
 
 interface FeaturesFormProps {
-  form: ReturnType<typeof useFormContext<PageBuilderData>>;
+  form: UseFormReturn<FieldValues>;
 }
 
 export const FeaturesForm: React.FC<FeaturesFormProps> = ({ form }) => {
@@ -143,7 +143,7 @@ export const FeaturesForm: React.FC<FeaturesFormProps> = ({ form }) => {
   );
 };
 
-const FeatureDescriptionBlocks: React.FC<{ featureIndex: number; form: any }> = ({
+const FeatureDescriptionBlocks: React.FC<{ featureIndex: number; form: UseFormReturn<FieldValues> }> = ({
   featureIndex,
   form,
 }) => {

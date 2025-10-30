@@ -1,6 +1,6 @@
 import React from 'react';
-import { useFormContext, useFieldArray } from 'react-hook-form';
-import { PageBuilderData, ContentBlock } from '@/types/pagebuilder';
+import { useFieldArray, type UseFormReturn, type FieldValues } from 'react-hook-form';
+import { ContentBlock } from '@/types/pagebuilder';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import { Plus, Trash2, HelpCircle } from 'lucide-react';
 import { MarkdownEditor } from './MarkdownEditor';
 
 interface FaqFormProps {
-  form: ReturnType<typeof useFormContext<PageBuilderData>>;
+  form: UseFormReturn<FieldValues>;
 }
 
 export const FaqForm: React.FC<FaqFormProps> = ({ form }) => {
@@ -116,7 +116,7 @@ export const FaqForm: React.FC<FaqFormProps> = ({ form }) => {
   );
 };
 
-const FaqAnswerBlocks: React.FC<{ faqIndex: number; form: any }> = ({ faqIndex, form }) => {
+const FaqAnswerBlocks: React.FC<{ faqIndex: number; form: UseFormReturn<FieldValues> }> = ({ faqIndex, form }) => {
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: `faq.${faqIndex}.answer`,

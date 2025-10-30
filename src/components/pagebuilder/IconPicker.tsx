@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import * as LucideIcons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,17 +21,24 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
-  // Get all icon names from lucide-react
-  const allIconNames = useMemo(() => {
-    return Object.keys(LucideIcons)
-      .filter(key => {
-        // Filter out non-icon exports
-        const isReactComponent = typeof (LucideIcons as any)[key] === 'function' 
-          || typeof (LucideIcons as any)[key] === 'object';
-        const isNotUtility = !['createLucideIcon', 'Icon'].includes(key);
-        return isReactComponent && isNotUtility && key[0] === key[0].toUpperCase();
+  const { allIconNames, iconMap } = useMemo(() => {
+    const isLucideIcon = (component: unknown): component is LucideIcon =>
+      typeof component === 'function';
+
+    const entries = Object.entries(LucideIcons)
+      .filter(([key, component]) => {
+        const isValidExport =
+          isLucideIcon(component) &&
+          !['createLucideIcon', 'Icon'].includes(key) &&
+          key[0] === key[0].toUpperCase();
+        return isValidExport;
       })
-      .sort();
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    return {
+      allIconNames: entries.map(([key]) => key),
+      iconMap: Object.fromEntries(entries) as Record<string, LucideIcon>,
+    };
   }, []);
 
   // Filter icons based on search
@@ -42,8 +50,8 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
   }, [allIconNames, search]);
 
   // Get the icon component
-  const SelectedIcon = value && (LucideIcons as any)[value] 
-    ? (LucideIcons as any)[value] 
+  const SelectedIcon = value && iconMap[value]
+    ? iconMap[value]
     : LucideIcons.HelpCircle;
 
   return (
@@ -76,7 +84,7 @@ export const IconPicker: React.FC<IconPickerProps> = ({ value, onChange }) => {
           <ScrollArea className="h-[300px]">
             <div className="grid grid-cols-4 gap-2 p-2">
               {filteredIcons.map((iconName) => {
-                const IconComponent = (LucideIcons as any)[iconName];
+                const IconComponent = iconMap[iconName] ?? LucideIcons.HelpCircle;
                 const isSelected = value === iconName;
                 
                 return (

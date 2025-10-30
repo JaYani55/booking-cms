@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions'; // Add this import
 import { useTheme } from '../contexts/ThemeContext';
-import { EventForm } from '../components/events/EventForm';
+import { EventForm, EventFormValues } from '../components/events/EventForm';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,47 @@ import { getEmployerById } from '@/services/employer/employerService';
 import { useData } from '../contexts/DataContext'; 
 import { calculateEndTime } from '@/utils/timeUtils';
 import { calculateEventStatus } from '../utils/eventUtils';
-import { fetchProductById } from '@/services/events/productService';
+import { EventStatus, EventMode } from '@/types/event';
+
+type EventFormInitialValues = NonNullable<React.ComponentProps<typeof EventForm>["initialValues"]>;
+
+type SupabaseEventRow = {
+  id: string;
+  employer_id: string | null;
+  company: string | null;
+  date: string | null;
+  time: string | null;
+  end_time: string | null;
+  duration_minutes: number | null;
+  description: string | null;
+  status: EventStatus | null;
+  mode: EventMode | null;
+  amount_requiredmentors: number | null;
+  product_id: number | null;
+  staff_members: string[] | null;
+  teams_link: string | null;
+  initial_selected_mentors: string[] | null;
+};
+
+const toInitialValues = (input: Partial<EventFormInitialValues>): EventFormInitialValues => ({
+  id: input.id,
+  employer_id: input.employer_id ?? "",
+  company: input.company ?? "",
+  date: input.date ?? "",
+  time: input.time ?? "",
+  end_time: input.end_time,
+  duration_minutes: input.duration_minutes ?? 60,
+  description: input.description ?? "",
+  status: input.status ?? 'new',
+  mode: input.mode ?? 'online',
+  amount_requiredmentors: input.amount_requiredmentors ?? 1,
+  product_id: input.product_id ?? undefined,
+  staff_members: Array.isArray(input.staff_members) ? input.staff_members : [],
+  teams_link: input.teams_link ?? "",
+  initial_selected_mentors: Array.isArray(input.initial_selected_mentors)
+    ? input.initial_selected_mentors
+    : [],
+});
 
 const EditEvent = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +62,7 @@ const EditEvent = () => {
   const permissions = usePermissions(); // Use centralized permissions
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingEvent, setIsLoadingEvent] = useState(true);
-  const [eventData, setEventData] = useState<any>(null);
+  const [eventData, setEventData] = useState<EventFormInitialValues | null>(null);
   const [isSubmitSuccessful, setIsSubmitSuccessful] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -55,37 +95,60 @@ const EditEvent = () => {
       
       setIsLoadingEvent(true);
       try {
-        // First try to get from cache
-        let eventData = getEventById(id);
-        
-        // If not in cache, fetch directly from database
-        if (!eventData) {
-          const { data, error } = await supabase
-            .from('mentorbooking_events')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-          if (error) throw error;
-          eventData = data;
+        const cachedEvent = getEventById(id);
+
+        if (cachedEvent) {
+          const normalizedFromCache = toInitialValues({
+            id: cachedEvent.id,
+            employer_id: cachedEvent.employer_id,
+            company: cachedEvent.company,
+            date: cachedEvent.date,
+            time: cachedEvent.time,
+            end_time: cachedEvent.end_time,
+            duration_minutes: cachedEvent.duration_minutes,
+            description: cachedEvent.description,
+            status: cachedEvent.status,
+            mode: cachedEvent.mode,
+            amount_requiredmentors: cachedEvent.amount_requiredmentors,
+            product_id: cachedEvent.product_id,
+            staff_members: cachedEvent.staff_members,
+            teams_link: cachedEvent.teams_link,
+            initial_selected_mentors: cachedEvent.initial_selected_mentors,
+          });
+
+          setEventData(normalizedFromCache);
+          return;
         }
-        
-        // Transform event data for form
-        setEventData({
-          ...eventData,
-          // Ensure all required fields are present
-          employer_id: eventData.employer_id || "",
-          company: eventData.company || "",
-          date: eventData.date || "",
-          time: eventData.time || "",
-          description: eventData.description || "",
-          staff_members: eventData.staff_members || [],
-          status: eventData.status || "new",
-          mode: eventData.mode || 'online',
-          amount_requiredmentors: eventData.amount_requiredmentors || 1,
-          product_id: eventData.product_id || undefined,
-          teams_link: eventData.teams_link || "",
+
+        const { data, error } = await supabase
+          .from('mentorbooking_events')
+          .select('*')
+          .eq('id', id)
+          .single<SupabaseEventRow>();
+
+        if (error) throw error;
+
+        const normalizedFromDb = toInitialValues({
+          id: data.id,
+          employer_id: data.employer_id ?? undefined,
+          company: data.company ?? undefined,
+          date: data.date ?? undefined,
+          time: data.time ?? undefined,
+          end_time: data.end_time ?? undefined,
+          duration_minutes: data.duration_minutes ?? undefined,
+          description: data.description ?? undefined,
+          status: data.status ?? undefined,
+          mode: data.mode ?? undefined,
+          amount_requiredmentors: data.amount_requiredmentors ?? undefined,
+          product_id: data.product_id ?? undefined,
+          staff_members: Array.isArray(data.staff_members) ? data.staff_members : undefined,
+          teams_link: data.teams_link ?? undefined,
+          initial_selected_mentors: Array.isArray(data.initial_selected_mentors)
+            ? data.initial_selected_mentors
+            : undefined,
         });
+
+        setEventData(normalizedFromDb);
       } catch (error) {
         console.error("Error loading event:", error);
         toast.error(
@@ -101,7 +164,7 @@ const EditEvent = () => {
     fetchEvent();
   }, [id, getEventById, language]);
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: EventFormValues) => {
     setIsLoading(true);
     try {
       // Handle staff members properly
@@ -122,17 +185,20 @@ const EditEvent = () => {
       }
       
       // Calculate end time based on start time and duration
-      const end_time = calculateEndTime(values.time, values.duration_minutes);
+  const endTime = calculateEndTime(values.time, values.duration_minutes);
       
       // Get the current event to calculate status properly
       const currentEvent = getEventById(id);
       
       // Use locked status if specified, otherwise calculate
-      const newStatus = values.status === 'locked' ? 'locked' : 
-                       (currentEvent ? calculateEventStatus({
-                          ...currentEvent,
-                          amount_requiredmentors: values.amount_requiredmentors,
-                       }) : 'new');
+      const newStatus = values.status === 'locked'
+        ? 'locked'
+        : (currentEvent
+            ? calculateEventStatus({
+                ...currentEvent,
+                amount_requiredmentors: values.amount_requiredmentors,
+              })
+            : 'new');
       
       // Get product details if a product is selected (do not send ProductInfo to Supabase)
       // You can still fetch product details if needed for local use, but do not include in update payload
@@ -143,15 +209,15 @@ const EditEvent = () => {
           company: companyName,
           date: values.date,
           time: values.time,
-          end_time: end_time,
+          end_time: endTime,
           duration_minutes: values.duration_minutes,
-          description: values.description,
+          description: values.description ?? '',
           staff_members: staffMembers,
           status: newStatus,
-          mode: values.mode || 'online',
+          mode: values.mode ?? 'online',
           amount_requiredmentors: values.amount_requiredmentors,
-          product_id: values.product_id || null,
-          teams_link: values.teams_link || "",
+          product_id: values.product_id ?? null,
+          teams_link: values.teams_link ?? "",
         })
         .eq('id', id);
 
@@ -175,11 +241,12 @@ const EditEvent = () => {
           state: { from: sessionStorage.getItem('eventReferrer') } 
         });
       }, 500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error updating event:", error);
+      const message = error instanceof Error ? error.message : undefined;
       toast.error(
         language === 'en' 
-          ? error.message || 'Failed to update event' 
+          ? message || 'Failed to update event' 
           : 'Fehler beim Aktualisieren der Veranstaltung'
       );
     } finally {

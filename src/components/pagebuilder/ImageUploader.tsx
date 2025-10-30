@@ -53,7 +53,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
   const [itemToDelete, setItemToDelete] = useState<MediaItem | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const loadMediaLibrary = async (path: string = '') => {
+  const getErrorMessage = (error: unknown) =>
+    error instanceof Error ? error.message : 'Unbekannter Fehler.';
+
+  const loadMediaLibrary = useCallback(async (path: string = '') => {
     setLoadingMedia(true);
     try {
       console.log('Loading media from path:', path || 'root');
@@ -99,26 +102,27 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
       console.log('Processed media items:', items);
       setMediaItems(items);
-    } catch (error: any) {
-      toast.error(`Fehler beim Laden der Medien: ${error.message}`);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      toast.error(`Fehler beim Laden der Medien: ${message}`);
       console.error('Media loading error:', error);
     } finally {
       setLoadingMedia(false);
     }
-  };
+  }, [bucket]);
 
   const handleFolderClick = (folderName: string) => {
     const newPath = currentPath ? `${currentPath}/${folderName}` : folderName;
     setPathHistory([...pathHistory, currentPath]);
     setCurrentPath(newPath);
-    loadMediaLibrary(newPath);
+    void loadMediaLibrary(newPath);
   };
 
   const handleBackClick = () => {
     const previousPath = pathHistory[pathHistory.length - 1] || '';
     setPathHistory(pathHistory.slice(0, -1));
     setCurrentPath(previousPath);
-    loadMediaLibrary(previousPath);
+    void loadMediaLibrary(previousPath);
   };
 
   const handleCreateFolder = async () => {
@@ -145,8 +149,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       setNewFolderName('');
       setShowNewFolderDialog(false);
       await loadMediaLibrary(currentPath);
-    } catch (error: any) {
-      toast.error(`Fehler beim Erstellen des Ordners: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Fehler beim Erstellen des Ordners: ${getErrorMessage(error)}`);
     }
   };
 
@@ -202,8 +206,8 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       setShowDeleteDialog(false);
       setItemToDelete(null);
       await loadMediaLibrary(currentPath);
-    } catch (error: any) {
-      toast.error(`Fehler beim Löschen: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Fehler beim Löschen: ${getErrorMessage(error)}`);
     }
   };
 
@@ -243,12 +247,12 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       }
       // Reload media library at current location
       await loadMediaLibrary(folder || currentPath);
-    } catch (error: any) {
-      toast.error(`Upload fehlgeschlagen: ${error.message}`);
+    } catch (error: unknown) {
+      toast.error(`Upload fehlgeschlagen: ${getErrorMessage(error)}`);
     } finally {
       setUploading(false);
     }
-  }, [bucket, folder, currentPath]);
+  }, [bucket, folder, currentPath, loadMediaLibrary]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -272,7 +276,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       // Reset to root when opening
       setCurrentPath('');
       setPathHistory([]);
-      loadMediaLibrary('');
+      void loadMediaLibrary('');
     }
   };
 

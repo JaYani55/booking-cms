@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -140,8 +140,9 @@ export const PageBuilderForm: React.FC<PageBuilderFormProps> = ({ initialData, p
         const result = await saveProductPage(productId, data, productName);
         setSavedSlug(result.slug);
         toast.success('Product page saved successfully!');
-    } catch (error: any) {
-        toast.error(`Failed to save product page: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unbekannter Fehler beim Speichern.';
+    toast.error(`Failed to save product page: ${message}`);
     } finally {
         setIsSaving(false);
     }

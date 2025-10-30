@@ -104,7 +104,11 @@ export const useCalendarEvents = (events: Event[]) => {
     };
     
     eventsForDate.forEach(event => {
-      if (event && event.status && counts.hasOwnProperty(event.status)) {
+      if (
+        event &&
+        event.status &&
+        Object.prototype.hasOwnProperty.call(counts, event.status)
+      ) {
         counts[event.status]++;
       }
     });

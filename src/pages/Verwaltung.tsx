@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
+import type { LucideIcon } from 'lucide-react';
 import { 
   Settings, 
   Users, 
@@ -11,24 +11,27 @@ import {
   UserCheck, 
   Tags, 
   BarChart3, 
-  Plus,
-  ChevronRight
+  Plus
 } from 'lucide-react';
 import { AdminCard } from '@/components/admin/ui/AdminCard'; // Add this import
+
+type PermissionsShape = ReturnType<typeof usePermissions>;
+type PermissionFlag = {
+  [Key in keyof PermissionsShape]: PermissionsShape[Key] extends boolean ? Key : never;
+}[keyof PermissionsShape];
 
 // Define a unified type for all admin cards
 type AdminCardType = {
   title: string;
   description: string;
-  icon: React.ForwardRefExoticComponent<any>;
+  icon: LucideIcon;
   href: string;
-  permission: keyof ReturnType<typeof usePermissions>;
+  permission: PermissionFlag;
   color: string;
 };
 
 const Verwaltung = () => {
   const { language } = useTheme();
-  const { user } = useAuth();
   const permissions = usePermissions();
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);

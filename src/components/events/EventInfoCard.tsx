@@ -2,21 +2,15 @@ import { Event } from '@/types/event';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { UserRound, CalendarIcon, Building2, ExternalLink, AlertCircle } from 'lucide-react';
+import { UserRound, CalendarIcon, Building2, ExternalLink } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useData } from '@/contexts/DataContext';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserEventStatus } from '@/hooks/useUserEventStatus';
 import { useMentorRequests } from '@/hooks/useMentorRequests';
 import ConfirmationModal from '../shared/ConfirmationModal';
-import { MentorStatusBadge } from "@/components/mentors/MentorStatusBadge";
 import { CounterButton } from "@/components/ui/counter-button";
-import { QUERY_KEYS } from '@/constants/queryKeys';
 import { getEventTimeDisplay } from '@/utils/timeUtils';
 import { isEventInPast } from '@/utils/eventUtils';
-import { StaffStatusBadge } from "@/components/staff/StaffStatusBadge";
-import { AssignedStaffBadge } from "@/components/staff/AssignedStaffBadge";
 import { usePermissions } from '@/hooks/usePermissions';
 
 interface EventInfoCardProps {
@@ -24,7 +18,6 @@ interface EventInfoCardProps {
   refreshEventData?: () => Promise<void>;
   onViewRequestsClick?: () => void;
   isPastEvent?: boolean;
-  currentProduct?: any;
 }
 
 export const EventInfoCard = ({
@@ -32,14 +25,12 @@ export const EventInfoCard = ({
   refreshEventData,
   onViewRequestsClick,
   isPastEvent = false,
-  currentProduct
 }: EventInfoCardProps) => {
-  const { language, theme } = useTheme();
-  const { refetchEvents, refetchAllData } = useData();
+  const { language } = useTheme();
   const { user } = useAuth();
   const permissions = usePermissions();
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const { requestToMentor, processRequest, isRequestLoading } = useMentorRequests(event, user);
+  const { requestToMentor, isRequestLoading } = useMentorRequests(event, user);
 
   const isEventPast = isPastEvent || isEventInPast(event);
 

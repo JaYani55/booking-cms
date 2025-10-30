@@ -30,6 +30,25 @@ export function ProductCombobox({ value, onChange, disabled = false }: ProductCo
   const [highlightedIndex, setHighlightedIndex] = React.useState<number>(-1);
   const itemsRef = useRef<(HTMLDivElement | null)[]>([]);
 
+  const loadProducts = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchProducts();
+      setProducts(data);
+
+      if (value !== undefined) {
+        const selected = data.find((product) => product.id === value);
+        if (selected) {
+          setSelectedProduct(selected);
+        }
+      }
+    } catch (err) {
+      console.error("Exception loading Products:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [value]);
+
   // Format salary display
   const formatSalary = (Product: Product) => {
     if (!Product.salary_type || Product.salary_type === 'Standard') {
@@ -50,45 +69,30 @@ export function ProductCombobox({ value, onChange, disabled = false }: ProductCo
   // Debug log for value changes
   React.useEffect(() => {
     console.log("ProductCombobox value changed:", value, typeof value);
-    // Load the Product if a value is provided
-    if (value !== undefined) {
-      const ProductInState = Products.find(p => p.id === value);
-      if (ProductInState) {
-        setSelectedProduct(ProductInState);
-      } else {
-        // Load Products if we can't find the selected one
-        loadProducts();
-      }
-    } else {
+    if (value === undefined) {
       setSelectedProduct(null);
+      return;
     }
-  }, [value, Products]);
 
-  // Load Products when popover opens or on mount
+    const productInState = Products.find((product) => product.id === value);
+    if (productInState) {
+      setSelectedProduct(productInState);
+      return;
+    }
+
+    void loadProducts();
+  }, [value, Products, loadProducts]);
+
   React.useEffect(() => {
-    loadProducts();
-  }, [open]);
+    void loadProducts();
+  }, [loadProducts]);
 
-  // Function to load all Products
-  const loadProducts = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchProducts();
-      setProducts(data);
-      
-      // If we have a value, find and set the selected Product
-      if (value !== undefined) {
-        const selected = data.find(p => p.id === value);
-        if (selected) {
-          setSelectedProduct(selected);
-        }
-      }
-    } catch (err) {
-      console.error("Exception loading Products:", err);
-    } finally {
-      setLoading(false);
+  React.useEffect(() => {
+    if (!open) {
+      return;
     }
-  };
+    void loadProducts();
+  }, [open, loadProducts]);
   
   // Filter Products based on search text
   const filteredProducts = React.useMemo(() => {

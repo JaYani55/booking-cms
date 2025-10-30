@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-let retryCount = 0;
 const MAX_RETRIES = 3;
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;

@@ -4,6 +4,34 @@ import { Product, fetchProducts, deleteProduct, updateProduct, createProduct } f
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
+type EventSummary = {
+  id: string;
+  company: string;
+};
+
+const mapToEventSummaries = (rows: unknown[] | null | undefined): EventSummary[] => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+
+  return rows.flatMap<EventSummary>((row) => {
+    if (!row || typeof row !== 'object') {
+      return [];
+    }
+
+    const { id, company } = row as { id?: unknown; company?: unknown };
+
+    if (typeof id !== 'string') {
+      return [];
+    }
+
+    return [{
+      id,
+      company: typeof company === 'string' ? company : ''
+    }];
+  });
+};
+
 export function useProductManagement(onProductsChange?: () => void) {
   const { language } = useTheme();
   const [Products, setProducts] = useState<Product[]>([]);
@@ -47,11 +75,6 @@ export function useProductManagement(onProductsChange?: () => void) {
         is_mentor_product: ProductData.is_mentor_product || false
         // Remove any potential id field that might have been accidentally included
       };
-      
-      // Ensure no id field is present when creating
-      if ('id' in preparedData) {
-        delete (preparedData as any).id;
-      }
       
       if (editingProduct) {
         console.log(`Updating product ID ${editingProduct.id}`, preparedData);
@@ -132,21 +155,23 @@ export function useProductManagement(onProductsChange?: () => void) {
       console.log(`Using column '${productColumnName}' to check product references`);
       
       // Now query with the correct column name
-      const { data: events, error: checkError } = await supabase
+      const { data: rawEvents, error: checkError } = await supabase
         .from('mentorbooking_events')
         .select('id, company')
-        .eq(productColumnName, product.id) as { data: EventRecord[] | null; error: any };
-        
+        .eq(productColumnName, product.id);
+
       if (checkError) {
         console.warn(`Error checking relationships: ${checkError.message}, proceeding with delete`);
         setProductToDelete(product);
         setDeleteProductDialogOpen(true);
         return true;
       }
-      
+
+      const events = mapToEventSummaries(rawEvents);
+
       setProductToDelete(product);
       
-      if (events && events.length > 0) {
+      if (events.length > 0) {
         setEventsUsingProduct(events);
         setProductInUseDialogOpen(true);
         return false;
@@ -262,17 +287,19 @@ export function useProductManagement(onProductsChange?: () => void) {
       }
       
       // Now query with the correct column name
-      const { data: events, error: checkError } = await supabase
+      const { data: rawEvents, error: checkError } = await supabase
         .from('mentorbooking_events')
         .select('id, company')
-        .eq(productColumnName, product.id) as { data: EventRecord[] | null; error: any };
-        
+        .eq(productColumnName, product.id);
+
       if (checkError) {
         console.warn(`Error checking relationships: ${checkError.message}, proceeding with edit`);
         return true;
       }
-      
-      if (events && events.length > 0) {
+
+      const events = mapToEventSummaries(rawEvents);
+
+      if (events.length > 0) {
         setEventsUsingProductForEdit(events);
         setProductToEdit(product);
         setProductEditWarningOpen(true);
@@ -398,10 +425,3 @@ export function useProductManagement(onProductsChange?: () => void) {
     setProductEditWarningOpen
   };
 }
-
-// Add this type helper somewhere in your file
-type EventRecord = {
-  id: string;
-  company: string;
-  [key: string]: any;
-};

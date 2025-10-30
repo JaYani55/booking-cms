@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Loader2, Clock, Package, MessageSquarePlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useMentorProfileLoader } from '@/hooks/useMentorProfileLoader';
 import { fetchProductById, Product } from '@/services/events/productService';
+import type { ProductInfo } from '@/components/products/types';
 import { getIconByName } from '@/constants/pillaricons';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Card } from '@/components/ui/card';
@@ -21,6 +22,58 @@ import { DeleteEventDialog } from '@/components/events/DeleteEventDialog';
 import MentorRequestsModal from "@/components/events/MentorRequestsModal";
 import { MentorStatusPanel } from '@/components/events/MentorStatusTabs';
 import { ManualMentorApproval } from '../components/events/ManualMentorApproval';
+
+type DisplayProduct = {
+  id: number;
+  name: string;
+  description_de: string;
+  description_effort: string;
+  icon_name?: string;
+  gradient?: string;
+  assigned_groups?: number[];
+  salary_type?: Product['salary_type'];
+  salary?: number;
+  min_amount_mentors?: number;
+  max_amount_mentors?: number;
+  approved?: string[];
+  is_mentor_product?: boolean;
+};
+
+const buildDisplayProduct = (
+  product: Product | null,
+  info?: ProductInfo
+): DisplayProduct | null => {
+  if (product) {
+    return {
+      id: product.id,
+      name: product.name,
+      description_de: product.description_de,
+      description_effort: product.description_effort,
+      icon_name: product.icon_name ?? info?.icon_name,
+      gradient: product.gradient ?? info?.gradient,
+      assigned_groups: product.assigned_groups,
+      salary_type: product.salary_type,
+      salary: product.salary,
+      min_amount_mentors: product.min_amount_mentors,
+      max_amount_mentors: product.max_amount_mentors,
+      approved: product.approved,
+      is_mentor_product: product.is_mentor_product,
+    };
+  }
+
+  if (info) {
+    return {
+      id: info.id,
+      name: info.name,
+      description_de: info.description_de ?? '',
+      description_effort: info.description_effort ?? '',
+      icon_name: info.icon_name,
+      gradient: info.gradient,
+    };
+  }
+
+  return null;
+};
 
 const EventDetail = () => {
   const { refetchEvents, getUserProfile } = useData();
@@ -58,25 +111,53 @@ const EventDetail = () => {
 
   useEffect(() => {
     const loadProductDetails = async () => {
-      if (event?.product_id && !event.ProductInfo) {
-        setIsLoadingProduct(true);
-        try {
-          const product = await fetchProductById(event.product_id);
+      if (!event?.product_id) {
+        setProductDetails(event?.ProductInfo
+          ? {
+              id: event.ProductInfo.id,
+              name: event.ProductInfo.name,
+              description_de: event.ProductInfo.description_de ?? '',
+              description_effort: event.ProductInfo.description_effort ?? '',
+              icon_name: event.ProductInfo.icon_name,
+              gradient: event.ProductInfo.gradient,
+            }
+          : null);
+        return;
+      }
+
+      setIsLoadingProduct(true);
+      try {
+        const product = await fetchProductById(event.product_id);
+        if (product) {
           setProductDetails(product);
-        } catch (error) {
-          console.error('Error loading product details:', error);
-        } finally {
-          setIsLoadingProduct(false);
+        } else if (event.ProductInfo) {
+          setProductDetails({
+            id: event.ProductInfo.id,
+            name: event.ProductInfo.name,
+            description_de: event.ProductInfo.description_de ?? '',
+            description_effort: event.ProductInfo.description_effort ?? '',
+            icon_name: event.ProductInfo.icon_name,
+            gradient: event.ProductInfo.gradient,
+          });
+        } else {
+          setProductDetails(null);
         }
-      } else if (event?.ProductInfo) {
-        setProductDetails({
-          id: event.ProductInfo.id,
-          name: event.ProductInfo.name,
-          icon_name: event.ProductInfo.icon_name,
-          gradient: event.ProductInfo.gradient,
-          description_de: event.ProductInfo.description_de || '',
-          description_effort: event.ProductInfo.description_effort || '',
-        } as Product);
+      } catch (error) {
+        console.error('Error loading product details:', error);
+        if (event?.ProductInfo) {
+          setProductDetails({
+            id: event.ProductInfo.id,
+            name: event.ProductInfo.name,
+            description_de: event.ProductInfo.description_de ?? '',
+            description_effort: event.ProductInfo.description_effort ?? '',
+            icon_name: event.ProductInfo.icon_name,
+            gradient: event.ProductInfo.gradient,
+          });
+        } else {
+          setProductDetails(null);
+        }
+      } finally {
+        setIsLoadingProduct(false);
       }
     };
 
@@ -112,22 +193,14 @@ const EventDetail = () => {
         setSelectedMentorNames([]);
       }
 
-      const currentProduct = event?.ProductInfo ? {
-        id: event.ProductInfo.id,
-        name: event.ProductInfo.name,
-        icon_name: event.ProductInfo.icon_name,
-        gradient: event.ProductInfo.gradient,
-        description_de: event.ProductInfo.description_de || '',
-        description_effort: event.ProductInfo.description_effort || '',
-        assigned_groups: (event.ProductInfo as any).assigned_groups,
-      } : productDetails;
+      const assignedGroupIds = productDetails?.assigned_groups ?? event?.ProductInfo?.assigned_groups ?? [];
 
-      if (currentProduct?.assigned_groups && currentProduct.assigned_groups.length > 0) {
+      if (assignedGroupIds.length > 0) {
         try {
           const { data, error } = await supabase
             .from('mentor_groups')
             .select('id, group_name')
-            .in('id', currentProduct.assigned_groups);
+            .in('id', assignedGroupIds);
           if (!error && data) {
             const groupMap = data.reduce((acc, group) => {
               acc[group.id] = group.group_name;
@@ -148,21 +221,10 @@ const EventDetail = () => {
   // Use a boolean for mentor requests section
   const shouldShowMentorRequests = !!event && isEventOwner;
 
-  const currentProduct = event?.ProductInfo ? {
-    id: event.ProductInfo.id,
-    name: event.ProductInfo.name,
-    icon_name: event.ProductInfo.icon_name,
-    gradient: event.ProductInfo.gradient,
-    description_de: event.ProductInfo.description_de || '',
-    description_effort: event.ProductInfo.description_effort || '',
-    salary_type: (event.ProductInfo as any).salary_type,
-    salary: (event.ProductInfo as any).salary,
-    min_amount_mentors: (event.ProductInfo as any).min_amount_mentors,
-    max_amount_mentors: (event.ProductInfo as any).max_amount_mentors,
-    approved: (event.ProductInfo as any).approved,
-    assigned_groups: (event.ProductInfo as any).assigned_groups,
-    is_mentor_product: (event.ProductInfo as any).is_mentor_product,
-  } : productDetails;
+  const currentProduct = useMemo(
+    () => buildDisplayProduct(productDetails, event?.ProductInfo),
+    [productDetails, event?.ProductInfo]
+  );
 
   // Handle mentor action submission
   const handleMentorActionsProcessed = async () => {
@@ -256,7 +318,6 @@ const EventDetail = () => {
             refreshEventData={handleMentorActionsProcessed} 
             onViewRequestsClick={() => setMentorRequestsModalOpen(true)}
             isPastEvent={isPastEvent}
-            currentProduct={currentProduct}
           />
         </div>
         <div className="lg:col-span-2 space-y-6">

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { seatableClient } from '@/lib/seatableClient';
 import { 
   ColumnMetadata, 
@@ -18,10 +18,13 @@ export function useSeatableMentors(options: UseSeatableMentorsOptions = {}) {
   } = options;
 
   // Create a specific query key that includes the view
-  const queryKey = [QUERY_KEYS.SEATABLE_MENTORS, tableName, viewName || 'no-view'];
+  const queryKey = useMemo(
+    () => [QUERY_KEYS.SEATABLE_MENTORS, tableName, viewName || 'no-view'],
+    [tableName, viewName]
+  );
   
   // Use ref to store the refetch function to make it stable
-  const refetchRef = useRef<() => Promise<any>>();
+  const refetchRef = useRef<(() => Promise<unknown>) | undefined>(undefined);
   
   // Query to get data - ONLY runs when explicitly called
   const {
@@ -115,7 +118,7 @@ export function useSeatableMentors(options: UseSeatableMentorsOptions = {}) {
   
   // Update a field in a row
   const updateMentorField = useMutation({
-    mutationFn: async ({mentorId, field, value}: {mentorId: string, field: string, value: any}) => {
+    mutationFn: async ({mentorId, field, value}: {mentorId: string; field: string; value: unknown}) => {
       const rows = await seatableClient.getFilteredRows(tableName, idField, mentorId);
       
       if (rows.length === 0) {
@@ -134,7 +137,7 @@ export function useSeatableMentors(options: UseSeatableMentorsOptions = {}) {
   
   // Update multiple fields
   const updateMentor = useMutation({
-    mutationFn: async ({mentorId, data}: {mentorId: string, data: Record<string, any>}) => {
+    mutationFn: async ({mentorId, data}: {mentorId: string; data: Record<string, unknown>}) => {
       const rows = await seatableClient.getFilteredRows(tableName, idField, mentorId);
       
       if (rows.length === 0) {

@@ -16,18 +16,27 @@ const getUserStorageKey = (userId: string, setting: string) => {
   return `${STORAGE_KEY_PREFIX}${userId}_${setting}`;
 };
 
-const getStoredSetting = (userId: string, setting: string, defaultValue: any) => {
+const getStoredSetting = <T,>(userId: string, setting: string, defaultValue: T): T => {
   try {
     const key = getUserStorageKey(userId, setting);
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
+    if (!stored) {
+      return defaultValue;
+    }
+
+    try {
+      return JSON.parse(stored) as T;
+    } catch (parseError) {
+      console.warn(`Failed to parse setting ${setting}:`, parseError);
+      return defaultValue;
+    }
   } catch (error) {
     console.warn(`Failed to load setting ${setting}:`, error);
     return defaultValue;
   }
 };
 
-const storeSetting = (userId: string, setting: string, value: any) => {
+const storeSetting = <T,>(userId: string, setting: string, value: T): boolean => {
   try {
     const key = getUserStorageKey(userId, setting);
     localStorage.setItem(key, JSON.stringify(value));

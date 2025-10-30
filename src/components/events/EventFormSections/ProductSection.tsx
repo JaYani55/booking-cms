@@ -1,5 +1,6 @@
 import React from "react";
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import type { Control, FieldValues } from "react-hook-form";
 import { ProductCombobox } from "../ProductCombobox";
 import { Sparkles, Sparkle } from "lucide-react"; // Sparkle for trait separator
 import { Product } from '@/components/products/types';
@@ -18,15 +19,23 @@ function formatCompensation(product: Product, language: string) {
   return "-";
 }
 
-interface ProductSectionProps {
-  form: any;
+interface ProductSectionProps<TFieldValues extends FieldValues = FieldValues> {
+  form: {
+    control: Control<TFieldValues>;
+  };
   selectedProduct: Product | null;
   groupNames: Record<string, string>;
   isLoading: boolean;
   language: string;
 }
 
-export function ProductSection({ form, selectedProduct, groupNames, isLoading, language }: ProductSectionProps) {
+export function ProductSection<TFieldValues extends FieldValues = FieldValues>({
+  form,
+  selectedProduct,
+  groupNames,
+  isLoading,
+  language,
+}: ProductSectionProps<TFieldValues>) {
   return (
     <div className="mb-10">
       {/* Section Title with Icon */}

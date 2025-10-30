@@ -1,6 +1,6 @@
 import React from 'react';
-import { useFormContext, useFieldArray } from 'react-hook-form';
-import { PageBuilderData, ContentBlock } from '@/types/pagebuilder';
+import { useFieldArray, type UseFormReturn, type FieldValues } from 'react-hook-form';
+import { ContentBlock } from '@/types/pagebuilder';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,7 @@ import { MarkdownEditor } from './MarkdownEditor';
 import { IconPicker } from './IconPicker';
 
 interface CardsFormProps {
-  form: ReturnType<typeof useFormContext<PageBuilderData>>;
+  form: UseFormReturn<FieldValues>;
 }
 
 export const CardsForm: React.FC<CardsFormProps> = ({ form }) => {
@@ -131,7 +131,7 @@ export const CardsForm: React.FC<CardsFormProps> = ({ form }) => {
   );
 };
 
-const CardContentBlocks: React.FC<{ cardIndex: number; form: any }> = ({
+const CardContentBlocks: React.FC<{ cardIndex: number; form: UseFormReturn<FieldValues> }> = ({
   cardIndex,
   form,
 }) => {

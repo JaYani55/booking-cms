@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useTheme } from '../contexts/ThemeContext';
-import { EventForm } from '../components/events/EventForm';
+import { EventForm, EventFormValues } from '../components/events/EventForm';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,11 @@ const CreateEvent = () => {
   }, [user, loading, navigate, permissions.canCreateEvents]);
   
   // Update handleSubmit to ensure both fields are always populated
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: EventFormValues) => {
     setIsSubmitting(true);
     
     try {
-      const end_time = calculateEndTime(values.time, values.duration_minutes);
+  const endTime = calculateEndTime(values.time, values.duration_minutes);
       
       // Ensure staff_members is always populated
       const staffMembers = values.staff_members && values.staff_members.length > 0 
@@ -54,26 +54,26 @@ const CreateEvent = () => {
         : user?.id ? [user.id] : []; // Fallback to current user
     
       // Insert into database - only include existing columns
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('mentorbooking_events')
         .insert({
           company: values.company,
           employer_id: values.employer_id,
           date: values.date,
           time: values.time,
-          end_time: end_time,
+          end_time: endTime,
           duration_minutes: values.duration_minutes,
-          description: values.description,
+          description: values.description ?? '',
           staff_members: staffMembers,
           status: values.status,
-          mode: values.mode || 'online',
+          mode: values.mode ?? 'online',
           requesting_mentors: [],
           accepted_mentors: [],
           declined_mentors: [],
           amount_requiredmentors: values.amount_requiredmentors,
-          product_id: values.product_id || null,
-          teams_link: values.teams_link || "",
-          initial_selected_mentors: values.initial_selected_mentors || [],
+          product_id: values.product_id ?? null,
+          teams_link: values.teams_link ?? "",
+          initial_selected_mentors: values.initial_selected_mentors ?? [],
         })
         .select();
       
@@ -88,11 +88,12 @@ const CreateEvent = () => {
       );
       
       navigate('/events');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating event:', error);
+      const message = error instanceof Error ? error.message : undefined;
       toast.error(
         language === 'en' 
-          ? error.message || 'Failed to create event' 
+          ? message || 'Failed to create event' 
           : 'Fehler beim Erstellen der Veranstaltung'
       );
     } finally {

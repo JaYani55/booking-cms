@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNavigate } from "react-router-dom";
-import { Tags, Plus, Edit, Trash2 } from 'lucide-react';
+import { Tags } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 
@@ -19,9 +19,13 @@ interface MentorGroup {
   id: number;
   group_name: string;
   description: string | null;
-  user_in_group: any[] | null;
+  user_in_group: string[];
   created_by: string | null;
 }
+
+type MentorGroupRow = Omit<MentorGroup, 'user_in_group'> & {
+  user_in_group: string[] | null;
+};
 
 // Define form state
 interface FormState {
@@ -50,31 +54,36 @@ const VerwaltungMentorGroups = () => {
   const hasPermission = permissions.canManageTraits;
 
   // Fetch traits
-  useEffect(() => {
-    if (!hasPermission) {
-      navigate('/verwaltung');
-      return;
-    }
-    fetchGroups();
-  }, [hasPermission, navigate]);
-
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('mentor_groups')
+        .from<MentorGroupRow>('mentor_groups')
         .select('*')
         .order('group_name', { ascending: true });
 
       if (error) throw error;
-      setGroups(data || []);
+      setGroups(
+        (data || []).map((group) => ({
+          ...group,
+          user_in_group: Array.isArray(group.user_in_group) ? group.user_in_group : [],
+        }))
+      );
     } catch (error) {
       console.error('Error fetching groups:', error);
       toast.error(language === 'en' ? 'Failed to load traits' : 'Fehler beim Laden der Eigenschaften');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [language]);
+
+  useEffect(() => {
+    if (!hasPermission) {
+      navigate('/verwaltung');
+      return;
+    }
+    fetchGroups();
+  }, [fetchGroups, hasPermission, navigate]);
 
   // Open create form
   const handleCreateClick = () => {
@@ -109,7 +118,7 @@ const VerwaltungMentorGroups = () => {
       if (error) throw error;
 
       toast.success(language === 'en' ? 'Trait deleted successfully' : 'Eigenschaft erfolgreich gelöscht');
-      fetchGroups();
+  await fetchGroups();
     } catch (error) {
       console.error('Error deleting group:', error);
       toast.error(language === 'en' ? 'Failed to delete trait' : 'Fehler beim Löschen der Eigenschaft');
@@ -157,7 +166,7 @@ const VerwaltungMentorGroups = () => {
       }
 
       setShowDialog(false);
-      fetchGroups();
+  await fetchGroups();
     } catch (error) {
       console.error('Error saving group:', error);
       toast.error(language === 'en' ? 'Failed to save trait' : 'Fehler beim Speichern der Eigenschaft');

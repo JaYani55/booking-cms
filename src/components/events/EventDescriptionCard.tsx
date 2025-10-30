@@ -14,7 +14,6 @@ import { AssignedStaffBadge } from "@/components/staff/AssignedStaffBadge";
 interface EventDescriptionCardProps {
   event: Event;
   shouldShowMentorRequests: boolean;
-  requestingMentors: any[];
   onMentorActionsProcessed: () => Promise<void>;
   isPastEvent?: boolean;
 }
@@ -22,7 +21,6 @@ interface EventDescriptionCardProps {
 export const EventDescriptionCard = ({ 
   event, 
   shouldShowMentorRequests, 
-  requestingMentors,
   onMentorActionsProcessed,
   isPastEvent = false
 }: EventDescriptionCardProps) => {

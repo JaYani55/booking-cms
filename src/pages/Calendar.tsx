@@ -128,7 +128,7 @@ const Calendar = () => {
                       <div className="flex flex-wrap gap-1 mt-2">
                         {dayEvents.map((event) => {
                           const product = event.ProductInfo;
-                          let color = getDotColor(product);
+                          const color = getDotColor(product);
                           return (
                             <span
                               key={event.id}

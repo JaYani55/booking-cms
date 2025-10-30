@@ -9,10 +9,27 @@ export interface ColumnMetadata {
   };
 }
 
+export interface SeaTableSelectOption {
+  id: string;
+  name: string;
+  [key: string]: unknown;
+}
+
+export interface SeaTableColumnData {
+  options?: SeaTableSelectOption[];
+  [key: string]: unknown;
+}
+
 // SeaTable row data
 export interface SeaTableRow {
   _id: string;
-  [key: string]: any;
+  [key: string]: unknown;
+}
+
+export interface SeaTableViewMetadata {
+  name?: string;
+  view_name?: string;
+  [key: string]: unknown;
 }
 
 // Table structure metadata
@@ -22,24 +39,25 @@ export interface SeaTableColumn {
   type: string;
   width: number;
   editable: boolean;
-  [key: string]: any;
+  data?: SeaTableColumnData;
+  [key: string]: unknown;
 }
 
 export interface SeaTableTableMetadata {
   _id: string;
   name: string;
   columns: SeaTableColumn[];
-  views: any[];
-  [key: string]: any;
+  views: SeaTableViewMetadata[];
+  [key: string]: unknown;
 }
 
 // Main metadata interface
 export interface SeaTableMetadata {
   metadata: {
     tables: SeaTableTableMetadata[];
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 // SeaTable API response types
@@ -69,8 +87,10 @@ export interface MentorProfile {
   Mentor_ID?: string;
   Vorname?: string;
   Nachname?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
+
+export type SeaTableRowUpdate = Record<string, unknown>;
 
 // Hook options
 export interface UseSeatableMentorsOptions {

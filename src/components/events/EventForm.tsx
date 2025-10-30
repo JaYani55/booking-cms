@@ -31,7 +31,7 @@ import { useTheme } from "../../contexts/ThemeContext";
 import { useAuth } from '../../contexts/AuthContext';
 import { EventStatus, EventMode } from '@/types/event';
 import { format } from 'date-fns';
-import { fetchProducts, fetchProductById, Product } from '../../services/events/productService';
+import { fetchProductById, Product } from '../../services/events/productService';
 import { CompanyCombobox } from "./CompanyCombobox";
 import { testDirectEmployerQuery } from "../../services/employer/employerService";
 import { searchEmployers } from "../../services/employer/employerService";
@@ -81,7 +81,7 @@ const formSchema = zod.object({
   }).optional(),
 });
 
-type FormValues = zod.infer<typeof formSchema>;
+export type EventFormValues = zod.infer<typeof formSchema>;
 
 interface EventFormProps {
   initialValues?: {
@@ -101,7 +101,7 @@ interface EventFormProps {
     teams_link?: string;
     initial_selected_mentors?: string[];
   };
-  onSubmit: (values: FormValues) => Promise<void>;
+  onSubmit: (values: EventFormValues) => Promise<void>;
   isLoading: boolean;
   mode: 'create' | 'edit';
 }
@@ -114,8 +114,6 @@ export const EventForm: React.FC<EventFormProps> = ({
 }) => {
   const { language, theme } = useTheme();
   const { isSuperAdmin } = useAuth();
-  const [Products, setProducts] = useState<Product[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLocked, setIsLocked] = useState<boolean>(initialValues?.status === 'locked');
   const [previousStatus, setPreviousStatus] = useState<EventStatus>(initialValues?.status || 'new');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -125,7 +123,7 @@ export const EventForm: React.FC<EventFormProps> = ({
   const [approvedMentorNames, setApprovedMentorNames] = useState<{id: string, name: string}[]>([]);
   
   // Create form with defaults
-  const form = useForm<FormValues>({
+  const form = useForm<EventFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       employer_id: "",
@@ -163,18 +161,6 @@ export const EventForm: React.FC<EventFormProps> = ({
     return () => window.removeEventListener('beforeunload', warnUnsavedChanges);
   }, [isDirty, isLoading]);
 
-  // Load Products once
-  useEffect(() => {
-    const loadProducts = async () => {
-      setIsLoadingProducts(true);
-      const data = await fetchProducts();
-      setProducts(data);
-      setIsLoadingProducts(false);
-    };
-    
-    loadProducts();
-  }, []);
-  
   // Conditional debugging for initialValues
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -193,7 +179,7 @@ export const EventForm: React.FC<EventFormProps> = ({
       }
       
       // Only include the fields that are actually in your initialValues type
-      const formValues = {
+  const formValues: EventFormValues = {
         employer_id: initialValues.employer_id || "",
         company: initialValues.company || "",
         date: initialValues.date || format(new Date(), 'yyyy-MM-dd'),
@@ -257,10 +243,10 @@ export const EventForm: React.FC<EventFormProps> = ({
 
   // Add these state variables in the EventForm component
   const [showPastEventWarning, setShowPastEventWarning] = useState(false);
-  const [pendingSubmission, setPendingSubmission] = useState<FormValues | null>(null);
+  const [pendingSubmission, setPendingSubmission] = useState<EventFormValues | null>(null);
 
   // Submit handler
-  const handleSubmit = async (values: FormValues) => {
+  const handleSubmit = async (values: EventFormValues) => {
     try {
       // Check if the selected date is in the past (only for create mode)
       if (mode === 'create') {
@@ -285,7 +271,7 @@ export const EventForm: React.FC<EventFormProps> = ({
   };
 
   // Add helper function for actual submission
-  const submitEvent = async (values: FormValues) => {
+  const submitEvent = async (values: EventFormValues) => {
     // If a product is selected in the form
     if (values.product_id) {
       const productDetails = await fetchProductById(values.product_id);
@@ -305,6 +291,10 @@ export const EventForm: React.FC<EventFormProps> = ({
     
     await onSubmit(values);
   };
+
+  const watchedProductId = form.watch('product_id');
+  const watchedTime = form.watch('time');
+  const watchedDuration = form.watch('duration_minutes');
 
   // Fetch product details when product_id changes
   useEffect(() => {
@@ -365,8 +355,8 @@ export const EventForm: React.FC<EventFormProps> = ({
       }
     };
     
-    fetchSelectedProduct();
-  }, [form.watch('product_id')]);
+    void fetchSelectedProduct();
+  }, [watchedProductId, form, mode]);
 
   // Add this effect to fetch all traits
   useEffect(() => {
@@ -396,10 +386,6 @@ export const EventForm: React.FC<EventFormProps> = ({
     fetchGroupNames();
   }, []);
 
-  // Watch time and duration to calculate end time
-  const watchedTime = form.watch('time');
-  const watchedDuration = form.watch('duration_minutes');
-  
   // Calculate and display end time
   const endTime = React.useMemo(() => {
     if (watchedTime && watchedDuration) {

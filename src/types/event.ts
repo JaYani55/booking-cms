@@ -34,6 +34,7 @@ export interface Event {
     name: string;
     logo_url?: string;
   };
+  ProductInfo?: ProductInfo;
 }
 
 export interface EventFormData {

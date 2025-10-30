@@ -66,9 +66,9 @@ export const EditableUsername: React.FC<EditableUsernameProps> = ({
       } else {
         setError(language === 'de' ? 'Fehler beim Aktualisieren des Anzeigenamens. Bitte versuchen Sie es erneut.' : 'Failed to update username. Please try again.');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating username:', error);
-      if (error.message === 'USERNAME_ALREADY_TAKEN' || error.message.includes('unique') || error.message.includes('duplicate')) { // Adjusted error message check
+      if (error instanceof Error && (error.message === 'USERNAME_ALREADY_TAKEN' || error.message.includes('unique') || error.message.includes('duplicate'))) {
         setError(language === 'de' ? 'Dieser Anzeigename ist bereits vergeben. Bitte wählen Sie einen anderen.' : 'This username is already taken. Please choose a different one.');
       } else {
         setError(language === 'de' ? 'Fehler beim Aktualisieren des Anzeigenamens. Bitte versuchen Sie es erneut.' : 'Failed to update username. Please try again.');

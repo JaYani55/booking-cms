@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -23,40 +23,20 @@ interface UserProfile {
   created_at?: string;
 }
 
-interface UserRoleData {
-  user_id: string;
-  role_id: string;
-  roles: {
-    name: string;
-    id: string;
-  } | Array<{name: string; id: string}>;
-}
-
 interface MentorItem {
   user_id: string;
   Username: string;
 }
 
 export function MentorSelector({ eventId, excludeUserIds, onMentorSelected, language, disabled = false }: MentorSelectorProps) {
-  const { canManageTraits, canAssignMentors } = usePermissions();
+  const { canAssignMentors } = usePermissions();
   const [open, setOpen] = useState(false);
   const [mentors, setMentors] = useState<MentorItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Don't render if user doesn't have permission to assign mentors
-  if (!canAssignMentors) {
-    return null;
-  }
-
-  useEffect(() => {
-    if (open) {
-      loadMentors();
-    }
-  }, [open, excludeUserIds, eventId]);
-
-  const loadMentors = async () => {
+  const loadMentors = useCallback(async () => {
     try {
       setLoading(true);
       setErrorMessage(null);
@@ -141,10 +121,17 @@ export function MentorSelector({ eventId, excludeUserIds, onMentorSelected, lang
     } finally {
       setLoading(false);
     }
-  };
-  
+  }, [excludeUserIds, language]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    void loadMentors();
+  }, [open, loadMentors]);
+
   // Filter mentors based on search text
-  const filteredMentors = React.useMemo(() => {
+  const filteredMentors = useMemo(() => {
     if (!searchText) return mentors;
     
     const text = searchText.toLowerCase().trim();
@@ -152,6 +139,11 @@ export function MentorSelector({ eventId, excludeUserIds, onMentorSelected, lang
       (mentor.Username?.toLowerCase() || '').includes(text)
     );
   }, [mentors, searchText]);
+  
+  // Don't render if user doesn't have permission to assign mentors
+  if (!canAssignMentors) {
+    return null;
+  }
   
   // Handle mentor selection
   const selectMentor = async (mentor: MentorItem) => {

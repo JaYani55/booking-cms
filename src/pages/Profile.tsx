@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useTheme } from "../contexts/ThemeContext";
 import { useProfileData } from "@/hooks/useProfileData";
-import { useAuth } from "@/contexts/AuthContext";
 import { usePermissions } from '@/hooks/usePermissions';
 import { useSeatableMentors } from "@/hooks/useSeatableMentors";
 import { useMentorTraits } from "@/hooks/useMentorTraits";
@@ -12,13 +11,75 @@ import { SeaTableDataUnavailable } from "@/components/profile/SeaTableDataUnavai
 import { RegistrationInProcess } from "@/components/profile/RegistrationInProcess";
 import { EditableUsername } from '@/components/profile/EditableUsername';
 import { ColumnMetadata } from "@/types/seaTableTypes";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tags, User, Database } from 'lucide-react';
 
+type UseProfileDataReturn = ReturnType<typeof useProfileData>;
+type ProfileUser = UseProfileDataReturn['user'];
+type ProfileSeaTable = UseProfileDataReturn['seatableMentorData'];
+
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const getStringField = (row: ProfileSeaTable, key: string): string | null => {
+  if (!row) return null;
+  const value = row[key];
+  return isNonEmptyString(value) ? value : null;
+};
+
+const getDisplayUsername = (profile: ProfileUser, language: 'en' | 'de'): string => {
+  if (isNonEmptyString(profile?.Username)) {
+    return profile.Username;
+  }
+  return language === 'de' ? 'Noch kein Anzeigename gegeben' : 'No Username given';
+};
+
+const getInitials = (profile: ProfileUser, seatableData: ProfileSeaTable): string => {
+  const firstName = getStringField(seatableData, 'Vorname');
+  const lastName = getStringField(seatableData, 'Nachname');
+
+  if (firstName && lastName) {
+    return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  }
+
+  if (firstName) {
+    return firstName.charAt(0).toUpperCase();
+  }
+
+  if (isNonEmptyString(profile?.Username)) {
+    return profile.Username.charAt(0).toUpperCase();
+  }
+
+  return 'U';
+};
+
+const formatFieldValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+
+  if (Array.isArray(value)) {
+    return value.filter(Boolean).map(String).join(', ');
+  }
+
+  if (value instanceof Date) {
+    return value.toLocaleDateString();
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+
+  return String(value);
+};
+
 const Profile = () => {
   const { language } = useTheme();
-  const { user: currentUser } = useAuth();
   const permissions = usePermissions();
   const { 
     isLoading,
@@ -31,11 +92,12 @@ const Profile = () => {
   } = useProfileData(language);
   
   // ✅ Add local state for the current icon
-  const [currentAnimalIcon, setCurrentAnimalIcon] = useState(user?.selected_animal_icon);
+  const initialAnimalIcon = isNonEmptyString(user?.selected_animal_icon) ? user?.selected_animal_icon : undefined;
+  const [currentAnimalIcon, setCurrentAnimalIcon] = useState<string | undefined>(initialAnimalIcon);
   
   // ✅ Update local state when user data changes
   useEffect(() => {
-    setCurrentAnimalIcon(user?.selected_animal_icon);
+    setCurrentAnimalIcon(isNonEmptyString(user?.selected_animal_icon) ? user.selected_animal_icon : undefined);
   }, [user?.selected_animal_icon]);
 
   // Move the hook call to the top level and memoize the options
@@ -111,55 +173,18 @@ const Profile = () => {
     );
   }
 
-  const getDisplayUsername = (user: any, language: 'en' | 'de') => {
-    if (user?.Username) {
-      return user.Username;
-    }
-    return language === 'de' ? 'Noch kein Anzeigename gegeben' : 'No Username given';
-  };
-
   const displayUsername = getDisplayUsername(user, language);
 
   // Get initials for the profile photo
-  const getInitials = (user: any, seatableData: any) => {
-    // Try to get name from SeaTable data first
-    if (seatableData?.Vorname && seatableData?.Nachname) {
-      return `${seatableData.Vorname.charAt(0)}${seatableData.Nachname.charAt(0)}`.toUpperCase();
-    }
-    if (seatableData?.Vorname) {
-      return seatableData.Vorname.charAt(0).toUpperCase();
-    }
-    // Fallback to username
-    if (user?.Username) {
-      return user.Username.charAt(0).toUpperCase();
-    }
-    // Final fallback
-    return 'U';
-  };
-
   const initials = getInitials(user, seatableMentorData);
-  const displayName = user?.Username || displayUsername;
+  const displayName = isNonEmptyString(user?.Username) ? user.Username : displayUsername;
+  const profileRole = isNonEmptyString(user?.role) ? user.role : undefined;
+  const seatableEmail = getStringField(seatableMentorData, 'E-Mail-Adresse');
+  const seatableFirstName = getStringField(seatableMentorData, 'Vorname');
+  const seatableLastName = getStringField(seatableMentorData, 'Nachname');
+  const seatableFullName = [seatableFirstName, seatableLastName].filter(Boolean).join(' ');
 
   // Helper function to format field values (for traits and other data)
-  const formatFieldValue = (value: any, fieldName: string): string => {
-    if (value === null || value === undefined || value === '') {
-      return '';
-    }
-
-    // Handle arrays (multi-select fields)
-    if (Array.isArray(value)) {
-      return value.filter(Boolean).join(', ');
-    }
-
-    // Handle objects
-    if (typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-
-    // Convert to string
-    return String(value);
-  };
-
   // Skip fields that are handled separately in personal info
   const skipFields = [
     '_id', '_ctime', '_mtime', '_creator', '_last_modifier', '_locked', '_locked_by', '_archived',
@@ -186,7 +211,7 @@ const Profile = () => {
             profilePictureUrl={user?.pfp_url}
             displayName={displayName}
             initials={initials}
-            role={user?.role}
+            role={profileRole}
             isOwnProfile={true}
             language={language}
             selectedAnimalIcon={currentAnimalIcon}
@@ -237,7 +262,7 @@ const Profile = () => {
               </div>
               
               {/* Name fields from SeaTable */}
-              {(seatableMentorData.Vorname || seatableMentorData.Nachname) && (
+              {(seatableFirstName || seatableLastName) && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2 border-b border-gray-100">
                   <div className="font-medium text-muted-foreground text-sm sm:text-base flex items-center gap-2">
                     {language === 'de' ? 'Name:' : 'Name:'}
@@ -248,7 +273,7 @@ const Profile = () => {
                     )}
                   </div>
                   <div className="sm:col-span-2 text-sm sm:text-base">
-                    {[seatableMentorData.Vorname, seatableMentorData.Nachname].filter(Boolean).join(' ') || (
+                    {seatableFullName || (
                       <span className="text-muted-foreground italic">
                         {language === 'de' ? 'leer' : 'empty'}
                       </span>
@@ -258,7 +283,7 @@ const Profile = () => {
               )}
               
               {/* Email field from SeaTable */}
-              {seatableMentorData['E-Mail-Adresse'] && (
+              {seatableEmail && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 py-2 border-b border-gray-100">
                   <div className="font-medium text-muted-foreground text-sm sm:text-base flex items-center gap-2">
                     {language === 'de' ? 'E-Mail:' : 'Email:'}
@@ -269,11 +294,7 @@ const Profile = () => {
                     )}
                   </div>
                   <div className="sm:col-span-2 text-sm sm:text-base">
-                    {seatableMentorData['E-Mail-Adresse'] || (
-                      <span className="text-muted-foreground italic">
-                        {language === 'de' ? 'leer' : 'empty'}
-                      </span>
-                    )}
+                    {seatableEmail}
                   </div>
                 </div>
               )}
@@ -343,7 +364,7 @@ const Profile = () => {
                       )}
                     </div>
                     <div className="sm:col-span-2 text-sm sm:text-base">
-                      {formatFieldValue(value, key) || (
+                      {formatFieldValue(value) || (
                         <span className="text-muted-foreground italic">
                           {language === 'de' ? 'leer' : 'empty'}
                         </span>

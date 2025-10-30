@@ -40,6 +40,13 @@ export interface UserAccessibility {
 
 export type User = UserProfile & UserAccessibility;
 
+export interface UserProfileRecord {
+  user_id: string;
+  Username?: string | null;
+  profile_picture_url?: string | null;
+  [key: string]: unknown;
+}
+
 // Group related state types
 export interface AuthState {
   user: User | null;

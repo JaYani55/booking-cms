@@ -6,8 +6,8 @@ export function calculateEndTime(startTime: string, durationMinutes: number): st
     
     const [hours, minutes] = startTime.split(':').map(Number);
     
-    // Calculate total minutes
-    let totalMinutes = hours * 60 + minutes + durationMinutes;
+  // Calculate total minutes
+  const totalMinutes = hours * 60 + minutes + durationMinutes;
     
     // Calculate new hours and minutes
     const newHours = Math.floor(totalMinutes / 60) % 24;

@@ -8,7 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from '@/lib/supabase';
 import { seatableClient } from '@/lib/seatableClient';
 import { SeaTableDebug } from '@/components/debug/SeaTableDebug';
-import { QueryClient, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
+import { SeaTableRow, SeaTableViewMetadata } from '@/types/seaTableTypes';
+
+type SupabaseUserRecord = {
+  user_id: string;
+  Username?: string | null;
+  email?: string | null;
+  [key: string]: unknown;
+};
 
 export const SeaTableDataTest = () => {
   // Add this hook to get the query client instance
@@ -20,7 +28,7 @@ export const SeaTableDataTest = () => {
   const [viewName, setViewName] = useState<string>('intern'); // Try 'intern' instead of '__no_view__'
   const [availableViews, setAvailableViews] = useState<string[]>([]); // Store available views
   const [selectedRow, setSelectedRow] = useState<string | null>(null);
-  const [supabaseUsers, setSupabaseUsers] = useState<Record<string, any>>({});
+  const [supabaseUsers, setSupabaseUsers] = useState<Record<string, SupabaseUserRecord>>({});
   const [loadingSupabase, setLoadingSupabase] = useState<boolean>(false);
   const [verificationResults, setVerificationResults] = useState<{
     total: number;
@@ -31,7 +39,7 @@ export const SeaTableDataTest = () => {
   }>({ total: 0, matched: 0, unmatched: 0, matchedIds: [], unmatchedIds: [] });
   
   // Add state to store full table data (unfiltered)  
-  const [fullTableData, setFullTableData] = useState<any[]>([]);
+  const [fullTableData, setFullTableData] = useState<SeaTableRow[]>([]);
   
   // Use the hook with our specified table AND view
   const { 
@@ -48,9 +56,9 @@ export const SeaTableDataTest = () => {
   });
 
   // State for a single row's data
-  const [singleRowData, setSingleRowData] = useState<any>(null);
+  const [singleRowData, setSingleRowData] = useState<SeaTableRow | null>(null);
   const [loadingSingle, setLoadingSingle] = useState(false);
-  const [supabaseUserData, setSupabaseUserData] = useState<any>(null);
+  const [supabaseUserData, setSupabaseUserData] = useState<SupabaseUserRecord | null>(null);
   
   // Replace the hardcoded table list with:
   const [availableTables, setAvailableTables] = useState<{name: string; idField: string}[]>([
@@ -79,7 +87,15 @@ export const SeaTableDataTest = () => {
         const refreshedStructure = await seatableClient.getTableStructure(tableNameToCheck);
         
         if (refreshedStructure && refreshedStructure.views) {
-          const viewNames = refreshedStructure.views.map((view: any) => view.name || view.view_name || 'Unnamed View');
+          const viewNames = refreshedStructure.views.map((view: SeaTableViewMetadata) => {
+            if (typeof view.name === 'string' && view.name.length > 0) {
+              return view.name;
+            }
+            if (typeof view.view_name === 'string' && view.view_name.length > 0) {
+              return view.view_name;
+            }
+            return 'Unnamed View';
+          });
           setAvailableViews(viewNames);
           
           // Set default view logic
@@ -99,7 +115,15 @@ export const SeaTableDataTest = () => {
           setViewName('__no_view__');
         }
       } else {
-        const viewNames = tableStructure.views.map((view: any) => view.name || view.view_name || 'Unnamed View');
+        const viewNames = tableStructure.views.map((view: SeaTableViewMetadata) => {
+          if (typeof view.name === 'string' && view.name.length > 0) {
+            return view.name;
+          }
+          if (typeof view.view_name === 'string' && view.view_name.length > 0) {
+            return view.view_name;
+          }
+          return 'Unnamed View';
+        });
         
         setAvailableViews(viewNames);
         
@@ -135,12 +159,16 @@ export const SeaTableDataTest = () => {
     
     try {
       // Extract all Mentor_IDs from FULL TABLE DATA
-      const mentorIds = fullTableData
-        .map(m => m[idField])
-        .filter(Boolean) as string[];
+      const mentorIds = fullTableData.reduce<string[]>((acc, row) => {
+        const rawId = row[idField];
+        if (typeof rawId === 'string' && rawId.trim().length > 0) {
+          acc.push(rawId);
+        }
+        return acc;
+      }, []);
       
       // Lookup each ID in Supabase
-      const results: Record<string, any> = {};
+    const results: Record<string, SupabaseUserRecord> = {};
       const matched: string[] = [];
       const unmatched: string[] = [];
       
@@ -160,9 +188,13 @@ export const SeaTableDataTest = () => {
         }
         
         // Store results by ID
-        for (const user of data || []) {
-          results[user.user_id] = user;
-          matched.push(user.user_id);
+        const supabaseRows = (data ?? []) as SupabaseUserRecord[];
+
+        for (const user of supabaseRows) {
+          if (user?.user_id) {
+            results[user.user_id] = user;
+            matched.push(user.user_id);
+          }
         }
         
         // Find unmatched IDs from this batch

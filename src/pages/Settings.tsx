@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { DefaultViewSetting } from '@/components/profile/DefaultViewSetting';
-import { ArrowLeft, Info, Monitor, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, Info, Monitor, Shield, Zap, LayoutDashboard, PanelLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ProfileSkeleton } from '@/components/profile/ProfileSkeleton';
@@ -48,7 +48,7 @@ const storeSetting = <T,>(userId: string, setting: string, value: T): boolean =>
 };
 
 const Settings = () => {
-  const { language } = useTheme();
+  const { language, layoutMode, setLayoutMode } = useTheme();
   const { user } = useAuth();
   const [defaultView, setDefaultView] = React.useState<string>('events');
   const [isLoading, setIsLoading] = React.useState<boolean>(true);
@@ -147,6 +147,58 @@ const Settings = () => {
         </Card>
       ) : (
         <div className="space-y-6">
+          <Card className="p-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <PanelLeft className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">
+                  {language === "en" ? "Navigation Layout" : "Navigationslayout"}
+                </h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {language === "en" 
+                  ? "Choose between a top navigation bar or a side navigation bar." 
+                  : "Wählen Sie zwischen einer oberen Navigationsleiste oder einer seitlichen Navigation."}
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div 
+                  className={`cursor-pointer rounded-lg border-2 p-4 hover:bg-accent transition-all ${layoutMode === 'navbar' ? 'border-primary bg-accent/50' : 'border-transparent bg-card shadow-sm'}`}
+                  onClick={() => setLayoutMode('navbar')}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <LayoutDashboard className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="font-medium">
+                      {language === "en" ? "Top Navigation" : "Obere Navigation"}
+                    </span>
+                  </div>
+                  <div className="h-20 bg-muted/20 rounded border border-dashed border-muted-foreground/20 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 right-0 h-4 bg-primary/20 border-b border-primary/10"></div>
+                  </div>
+                </div>
+
+                <div 
+                  className={`cursor-pointer rounded-lg border-2 p-4 hover:bg-accent transition-all ${layoutMode === 'sidebar' ? 'border-primary bg-accent/50' : 'border-transparent bg-card shadow-sm'}`}
+                  onClick={() => setLayoutMode('sidebar')}
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-full bg-primary/10">
+                      <PanelLeft className="h-4 w-4 text-primary" />
+                    </div>
+                    <span className="font-medium">
+                      {language === "en" ? "Sidebar Navigation" : "Seitliche Navigation"}
+                    </span>
+                  </div>
+                  <div className="h-20 bg-muted/20 rounded border border-dashed border-muted-foreground/20 relative overflow-hidden">
+                     <div className="absolute top-0 left-0 bottom-0 w-8 bg-primary/20 border-r border-primary/10"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           <Card className="p-6">
             <DefaultViewSetting 
               defaultView={defaultView}

@@ -2,12 +2,15 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
 type Language = 'en' | 'de';
+export type LayoutMode = 'sidebar' | 'navbar';
 
 interface ThemeContextType {
   theme: Theme;
   language: Language;
+  layoutMode: LayoutMode;
   toggleTheme: () => void;
   toggleLanguage: () => void;
+  setLayoutMode: (mode: LayoutMode) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -15,6 +18,10 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
   const [language, setLanguage] = useState<Language>('de');
+  const [layoutMode, setLayoutModeState] = useState<LayoutMode>(() => {
+    const stored = localStorage.getItem('app_layout_mode');
+    return (stored === 'sidebar' || stored === 'navbar') ? stored : 'sidebar';
+  });
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -30,8 +37,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setLanguage(prev => prev === 'en' ? 'de' : 'en');
   };
 
+  const setLayoutMode = (mode: LayoutMode) => {
+    setLayoutModeState(mode);
+    localStorage.setItem('app_layout_mode', mode);
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, language, toggleTheme, toggleLanguage }}>
+    <ThemeContext.Provider value={{ theme, language, layoutMode, toggleTheme, toggleLanguage, setLayoutMode }}>
       {children}
     </ThemeContext.Provider>
   );
